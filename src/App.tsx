@@ -19,7 +19,8 @@ const dictionary = {
   "search": "खोजें", "index": "विषय सूची", "settings": "सेटिंग्स",
   "pages": "पेज लिस्ट", "arvind index": "अरविन्द इंडेक्स",
   "total": "कुल", "delete": "हटाएं", "confirm": "पुष्टि करें",
-  "found in": "में मिला", "items": "सामान", "safe mode": "सुरक्षा मोड"
+  "found in": "में मिला", "items": "सामान", "safe mode": "सुरक्षा मोड",
+  "find car": "गाड़ी खोजें", "global search": "दुकान में खोजें"
 };
 
 const translateText = (text) => {
@@ -64,10 +65,9 @@ export default function ArvindRegister() {
   const [activePage, setActivePage] = useState(null);
   const [pageSearchTerm, setPageSearchTerm] = useState(''); 
   const [indexSearchTerm, setIndexSearchTerm] = useState(''); 
+  const [stockSearchTerm, setStockSearchTerm] = useState(''); // NEW STATE FOR STOCK SEARCH
   const [isHindi, setIsHindi] = useState(false);
-  
-  // --- NEW: Safe Mode State (Double Check) ---
-  const [isSafeMode, setIsSafeMode] = useState(true); // Default ON for safety
+  const [isSafeMode, setIsSafeMode] = useState(true); 
 
   const [isAppUnlocked, setIsAppUnlocked] = useState(false); 
   const [loginPassInput, setLoginPassInput] = useState('');
@@ -177,9 +177,7 @@ export default function ArvindRegister() {
     setIsNewEntryOpen(false);
   };
 
-  // --- MODIFIED QTY UPDATE FOR SAFE MODE ---
   const updateQty = (id, amount) => {
-    // Safety Check
     if (isSafeMode) {
         const action = amount > 0 ? "Add" : "Reduce";
         if (!window.confirm(`${t(action)} 1 Qty?`)) return;
@@ -198,17 +196,11 @@ export default function ArvindRegister() {
     setData({ ...data, entries: updatedEntries });
   };
 
-  // --- NEW: GLOBAL SEARCH LOGIC (Deep Search) ---
   const globalSearchResults = useMemo(() => {
     if (!indexSearchTerm) return { pages: data.pages, items: [] };
-    
-    // 1. Filter Pages normally
     const filteredPages = data.pages.filter(p => p.itemName.toLowerCase().includes(indexSearchTerm.toLowerCase()));
-    
-    // 2. Filter Items across ALL pages
     const filteredItems = data.entries.filter(e => e.car.toLowerCase().includes(indexSearchTerm.toLowerCase()));
     
-    // Group items by their page for display
     const itemsGrouped = filteredItems.reduce((acc, item) => {
         const p = data.pages.find(page => page.id === item.pageId);
         if (p) {
@@ -259,7 +251,7 @@ export default function ArvindRegister() {
             <div className="relative flex-1">
                 <input 
                   className={`w-full pl-9 p-2 rounded border outline-none ${isDark ? 'bg-slate-900 border-slate-600 text-white' : 'bg-white border-yellow-500 text-black'}`}
-                  placeholder={t("Search Index or Item...")}
+                  placeholder={t("Search Index...")}
                   value={indexSearchTerm}
                   onChange={e => setIndexSearchTerm(e.target.value)}
                 />
@@ -271,7 +263,6 @@ export default function ArvindRegister() {
       </div>
 
       <div className={`m-2 border-2 ${isDark ? 'border-slate-700 bg-slate-900' : 'border-black bg-white'}`}>
-        {/* --- SECTION 1: MATCHING PAGES --- */}
         <div className={`flex border-b-2 ${isDark ? 'border-slate-700 bg-slate-800' : 'border-black bg-gray-100'} p-2`}>
           <div className="w-12 font-bold text-center border-r border-gray-400">No.</div>
           <div className="flex-1 font-bold pl-3 border-r border-gray-400">{t("Particulars")}</div>
@@ -296,36 +287,6 @@ export default function ArvindRegister() {
           ))}
           {globalSearchResults.pages.length === 0 && <div className="p-2 text-center text-gray-400 text-sm">No Pages Found</div>}
         </div>
-
-        {/* --- SECTION 2: MATCHING ITEMS (DEEP SEARCH) --- */}
-        {indexSearchTerm && Object.keys(globalSearchResults.items).length > 0 && (
-            <div className={`border-t-4 border-double ${isDark ? 'border-slate-600' : 'border-black'}`}>
-                <div className={`p-2 font-bold text-center uppercase tracking-widest ${isDark ? 'bg-slate-800 text-yellow-400' : 'bg-yellow-200 text-black'}`}>
-                    {t("Found In Items")}
-                </div>
-                {Object.entries(globalSearchResults.items).map(([pageName, items]) => {
-                    // Find the page object to navigate to it
-                    const targetPage = data.pages.find(p => p.itemName === pageName);
-                    return (
-                        <div key={pageName} className="border-b border-gray-300">
-                             <div 
-                                onClick={() => { if(targetPage) { setActivePage(targetPage); setView('page'); setPageSearchTerm(indexSearchTerm); } }}
-                                className={`p-2 font-bold text-sm cursor-pointer hover:underline flex items-center gap-2 ${isDark ? 'bg-slate-800 text-blue-300' : 'bg-gray-100 text-blue-800'}`}
-                             >
-                                <Book size={14}/> {t("Found in")} Page: {t(pageName)} <ChevronRight size={14}/>
-                             </div>
-                             {items.map(item => (
-                                 <div key={item.id} className={`pl-8 pr-4 py-2 flex justify-between border-t border-gray-100 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-                                    <span>{t(item.car)}</span>
-                                    <span className="font-bold">{item.qty}</span>
-                                 </div>
-                             ))}
-                        </div>
-                    )
-                })}
-            </div>
-        )}
-
       </div>
 
       <button onClick={() => setIsNewPageOpen(true)} className="fixed bottom-24 right-6 bg-yellow-500 text-black w-16 h-16 rounded-full shadow-xl border-4 border-white flex items-center justify-center active:scale-95 z-20">
@@ -372,6 +333,70 @@ export default function ArvindRegister() {
     </div>
   );
 
+  // --- NEW: STOCK SEARCH VIEW ---
+  const renderStockSearch = () => {
+      // Logic to find all items matching string
+      const filteredStock = data.entries.filter(e => stockSearchTerm && e.car.toLowerCase().includes(stockSearchTerm.toLowerCase()));
+      const totalStockCount = filteredStock.reduce((a,b) => a+b.qty, 0);
+
+      return (
+        <div className={`pb-24 min-h-screen p-4 ${isDark ? 'bg-slate-950' : 'bg-gray-100'}`}>
+            <div className="mb-4 sticky top-0 z-10 pt-2 pb-2 backdrop-blur-sm">
+                <div className="flex justify-between items-center mb-4">
+                    <h1 className={`text-2xl font-bold flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-800'}`}>
+                        <Search/> {t("Global Search")}
+                    </h1>
+                    <div className="flex gap-2">
+                        <button onClick={() => setIsSafeMode(!isSafeMode)} className={`p-1 rounded-full border ${isSafeMode ? 'bg-green-100 text-green-700 border-green-500' : 'bg-gray-200 text-gray-400'}`}>
+                            {isSafeMode ? <ShieldCheck size={20} /> : <ShieldAlert size={20} />}
+                        </button>
+                        <TranslateBtn />
+                    </div>
+                </div>
+
+                <div className="flex gap-2">
+                    <div className="relative flex-1">
+                        <input className={`w-full pl-9 p-3 rounded-xl border outline-none shadow-sm ${isDark ? 'bg-slate-800 border-slate-600 text-white' : 'bg-white border-gray-300 text-black'}`} placeholder={t("Type Car Name (e.g. Swift)...")} value={stockSearchTerm} onChange={e => setStockSearchTerm(e.target.value)}/>
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20}/>
+                        {stockSearchTerm && <button onClick={() => setStockSearchTerm('')} className="absolute right-2 top-1/2 -translate-y-1/2"><X size={16}/></button>}
+                    </div>
+                    <VoiceInput onResult={setStockSearchTerm} isDark={isDark} />
+                </div>
+                
+                {stockSearchTerm && (
+                    <div className={`mt-4 p-3 rounded-lg text-center font-bold border ${isDark ? 'bg-blue-900 border-blue-700 text-white' : 'bg-blue-100 border-blue-300 text-blue-900'}`}>
+                        {t("Total")} "{stockSearchTerm}": <span className="text-2xl ml-2">{totalStockCount}</span> Pcs
+                    </div>
+                )}
+            </div>
+
+            <div className="space-y-3">
+                {filteredStock.map(entry => {
+                    const p = data.pages.find(page => page.id === entry.pageId);
+                    return (
+                        <div key={entry.id} className={`p-4 rounded-xl border-l-4 shadow-sm flex items-center justify-between ${isDark ? 'bg-slate-800 border-l-blue-500 border-slate-700 text-white' : 'bg-white border-l-blue-500 border-gray-200 text-black'}`}>
+                            <div className="flex-1">
+                                <h3 className="font-bold text-lg">{t(entry.car)}</h3>
+                                <div onClick={() => { setActivePage(p); setView('page'); setPageSearchTerm(stockSearchTerm); }} className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded mt-1 cursor-pointer hover:underline ${isDark ? 'bg-slate-700 text-blue-300' : 'bg-gray-100 text-blue-700'}`}>
+                                    <Book size={12}/> {t(p?.itemName || "Unknown Page")} <ChevronRight size={12}/>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                               <button onClick={() => updateQty(entry.id, -1)} className="w-8 h-8 rounded-full border bg-gray-100 text-red-600 flex items-center justify-center"><Minus size={16}/></button>
+                               <span className="text-xl font-mono font-bold w-8 text-center">{entry.qty}</span>
+                               <button onClick={() => updateQty(entry.id, 1)} className="w-8 h-8 rounded-full border bg-gray-100 text-green-600 flex items-center justify-center"><Plus size={16}/></button>
+                            </div>
+                        </div>
+                    );
+                })}
+                {stockSearchTerm && filteredStock.length === 0 && (
+                    <div className="text-center mt-10 opacity-50 font-bold">No Items Found</div>
+                )}
+            </div>
+        </div>
+      );
+  };
+
   const renderPage = () => {
     const pageEntries = data.entries.filter(e => e.pageId === activePage.id);
     const filtered = pageEntries.filter(e => e.car.toLowerCase().includes(pageSearchTerm.toLowerCase()));
@@ -386,7 +411,6 @@ export default function ArvindRegister() {
                  <div className="flex justify-between items-start">
                     <p className={`text-xs font-bold uppercase ${isDark ? 'text-slate-400' : 'text-red-400'}`}>{t("Page No")}: {activePage.pageNo}</p>
                     <div className="flex gap-2">
-                        {/* SAFE MODE TOGGLE */}
                         <button onClick={() => setIsSafeMode(!isSafeMode)} className={`p-1 rounded-full border ${isSafeMode ? 'bg-green-100 text-green-700 border-green-500' : 'bg-gray-200 text-gray-400'}`}>
                             {isSafeMode ? <ShieldCheck size={20} /> : <ShieldAlert size={20} />}
                         </button>
@@ -501,13 +525,18 @@ export default function ArvindRegister() {
 
       {view === 'generalIndex' && renderGeneralIndex()}
       {view === 'pagesGrid' && renderPagesGrid()}
+      {view === 'stockSearch' && renderStockSearch()} 
       {view === 'page' && renderPage()}
       {view === 'alerts' && renderAlerts()}
       {view === 'settings' && renderSettings()}
       
-      <div className={`fixed bottom-0 w-full border-t flex justify-around p-2 pb-safe z-50 ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-300'}`}>
+      <div className={`fixed bottom-0 w-full border-t flex justify-between px-2 p-2 pb-safe z-50 ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-300'}`}>
          <NavBtn icon={Book} label={t("Index")} active={view === 'generalIndex'} onClick={() => setView('generalIndex')} isDark={isDark}/>
          <NavBtn icon={Grid} label={t("Pages")} active={view === 'pagesGrid'} onClick={() => { setView('pagesGrid'); setIndexSearchTerm(''); }} isDark={isDark}/>
+         
+         {/* NEW SEARCH BUTTON */}
+         <NavBtn icon={Search} label={t("Search")} active={view === 'stockSearch'} onClick={() => { setView('stockSearch'); setStockSearchTerm(''); }} isDark={isDark}/>
+
          <NavBtn icon={AlertTriangle} label={t("Alerts")} active={view === 'alerts'} onClick={() => setView('alerts')} alert={data.entries.some(e => e.qty < data.settings.limit)} isDark={isDark}/>
          <NavBtn icon={Settings} label={t("Settings")} active={view === 'settings'} onClick={() => setView('settings')} isDark={isDark}/>
       </div>
@@ -535,7 +564,6 @@ export default function ArvindRegister() {
             <p className="text-sm font-bold opacity-50 mb-4 text-black">{activePage?.itemName}</p>
             <div className="space-y-4">
               <div className="flex gap-2">
-                 {/* SHARED STOCK INSTRUCTION */}
                  <div className="flex-1">
                      <input autoFocus className="w-full border-2 border-black rounded p-3 text-lg font-bold text-black" placeholder="Car (e.g. Swift & Alto)" value={input.carName} onChange={e => setInput({...input, carName: e.target.value})} />
                      <p className="text-[10px] text-gray-500 mt-1">Tip: Use "Swift & Alto" for shared items.</p>
@@ -568,9 +596,9 @@ export default function ArvindRegister() {
 }
 
 const NavBtn = ({ icon: Icon, label, active, onClick, alert, isDark }) => (
-  <button onClick={onClick} className={`relative flex flex-col items-center p-2 rounded-xl transition-all ${active ? 'text-blue-600 bg-blue-50 dark:bg-slate-800 dark:text-blue-400' : 'text-gray-400 dark:text-slate-500'}`}>
+  <button onClick={onClick} className={`relative flex-1 flex flex-col items-center p-2 rounded-xl transition-all ${active ? 'text-blue-600 bg-blue-50 dark:bg-slate-800 dark:text-blue-400' : 'text-gray-400 dark:text-slate-500'}`}>
     <Icon size={24} strokeWidth={active ? 2.5 : 2} />
-    <span className="text-[10px] font-bold mt-1">{label}</span>
+    <span className="text-[10px] font-bold mt-1 text-center leading-none">{label}</span>
     {alert && <span className="absolute top-1 right-3 w-3 h-3 bg-red-500 rounded-full border-2 border-white animate-bounce"></span>}
   </button>
 );
