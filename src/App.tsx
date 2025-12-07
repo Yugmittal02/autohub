@@ -1,94 +1,119 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Plus, Minus, Search, X, Trash2, ArrowLeft, Book, Car, 
-  ChevronRight, Mic, Settings, AlertTriangle, Languages 
+  ChevronRight, Mic, Settings, AlertTriangle, Languages, 
+  Lock, Bell, Volume2, Save, LogOut
 } from 'lucide-react';
 
-// --- DATA & SETTINGS LOAD ---
+// --- DICTIONARY FOR TRANSLATION ---
+const dictionary = {
+  "brake": "ब्रेक", "pads": "पैड्स", "shoe": "शू", "oil": "तेल", "filter": "फिल्टर",
+  "light": "लाइट", "headlight": "हेडलाइट", "bumper": "बम्पर", "cover": "कवर",
+  "seat": "सीट", "mat": "मैट", "guard": "गार्ड", "horn": "हॉर्न", "mirror": "शीशा",
+  "glass": "कांच", "clutch": "क्लच", "wire": "तार", "battery": "बैटरी", "tyre": "टायर",
+  "tube": "ट्यूब", "alloy": "अलॉय", "wheel": "व्हील", "cap": "कैप", "door": "दरवाजा",
+  "handle": "हैंडल", "lock": "लॉक", "key": "चाबी", "sensor": "सेंसर", "screen": "स्क्रीन",
+  "android": "एंड्रॉइड", "speaker": "स्पीकर", "bass": "बास", "tube": "ट्यूब",
+  "swift": "स्विफ्ट", "thar": "थार", "creta": "क्रेटा", "alto": "आल्टो",
+  "universal": "यूनिवर्सल", "page": "पेज", "qty": "मात्रा", "car": "गाड़ी",
+  "search": "खोजें", "index": "विषय सूची", "settings": "सेटिंग्स"
+};
+
+const translateText = (text) => {
+  if (!text) return "";
+  return text.split(' ').map(word => {
+    const lower = word.toLowerCase();
+    return dictionary[lower] ? dictionary[lower] : word; // Agar dictionary me h to hindi, nahi to english
+  }).join(' ');
+};
+
+// --- DATA LOAD ---
 const loadData = () => {
-  if (typeof window === 'undefined') return { pages: [], entries: [], settings: { limit: 5, theme: 'light' } };
-  const saved = localStorage.getItem('adv-register-data');
+  if (typeof window === 'undefined') return { pages: [], entries: [], settings: { limit: 5, theme: 'light', password: '123' } };
+  const saved = localStorage.getItem('ultra-register-data');
   if (saved) return JSON.parse(saved);
-  
-  // Demo Data
   return {
-    pages: [
-      { id: 1, pageNo: 1, itemName: 'Brake Pads' },
-      { id: 2, pageNo: 2, itemName: 'Oil Filter' },
-      { id: 3, pageNo: 3, itemName: 'Headlights (LED)' }
-    ],
-    entries: [
-      { id: 101, pageId: 1, car: 'Swift', qty: 12 },
-      { id: 102, pageId: 1, car: 'Thar', qty: 2 }, // Low Stock
-      { id: 103, pageId: 2, car: 'Creta', qty: 20 },
-      { id: 104, pageId: 3, car: 'Verna', qty: 3 } // Low Stock
-    ],
-    settings: { limit: 5, theme: 'light' } // Default Alert Limit 5
+    pages: [],
+    entries: [],
+    settings: { limit: 5, theme: 'light', password: '123' } // Default Password: 123
   };
 };
 
-// --- VOICE COMPONENT (Robust) ---
+// --- VOICE COMPONENT ---
 const VoiceInput = ({ onResult, isDark }) => {
-  const [isListening, setIsListening] = useState(false);
-
   const startListening = () => {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       const recognition = new SpeechRecognition();
-      
-      // 'en-IN' captures Hinglish best (e.g. "Swift ka bumper" -> "Swift ka bumper")
       recognition.lang = 'en-IN'; 
-      recognition.continuous = false;
-      recognition.interimResults = false;
-
-      recognition.onstart = () => setIsListening(true);
-      recognition.onend = () => setIsListening(false);
-      recognition.onerror = () => setIsListening(false);
-
-      recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        if(transcript) onResult(transcript);
-      };
-      
+      recognition.onresult = (e) => onResult(e.results[0][0].transcript);
       try { recognition.start(); } catch (e) { console.error(e); }
-    } else {
-      alert("Mic not supported");
-    }
+    } else { alert("Mic Error"); }
   };
-
   return (
-    <button 
-      onClick={startListening}
-      className={`p-3 rounded-full transition-all ${isListening ? 'bg-red-500 text-white animate-pulse' : (isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-600')}`}
-    >
+    <button onClick={startListening} className={`p-3 rounded-full ${isDark ? 'bg-slate-700 text-white' : 'bg-gray-100 text-black'}`}>
       <Mic size={20}/>
     </button>
   );
 };
 
-export default function AdvancedRegister() {
+export default function UltraRegister() {
   const [data, setData] = useState(loadData);
-  const [view, setView] = useState('index'); // index, page, finder, alert, settings
+  const [view, setView] = useState('generalIndex'); // Default: General Index
   const [activePage, setActivePage] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [isHindi, setIsHindi] = useState(false); // Translation Toggle
+  const [isHindi, setIsHindi] = useState(false);
+  
+  // Security State
+  const [isAuthenticated, setIsAuthenticated] = useState(false); // For settings
+  const [passInput, setPassInput] = useState('');
+  const [showPassModal, setShowPassModal] = useState(false);
+  const [newPass, setNewPass] = useState('');
 
   // Modals
   const [isNewPageOpen, setIsNewPageOpen] = useState(false);
   const [isNewEntryOpen, setIsNewEntryOpen] = useState(false);
   const [input, setInput] = useState({ itemName: '', carName: '', qty: '' });
 
-  // Save Data
+  // Audio Ref
+  const audioRef = useRef(null);
+
   useEffect(() => {
-    localStorage.setItem('adv-register-data', JSON.stringify(data));
+    localStorage.setItem('ultra-register-data', JSON.stringify(data));
+    
+    // Check for Low Stock Alert
+    const lowStock = data.entries.filter(e => e.qty < data.settings.limit);
+    if (lowStock.length > 0) {
+      // Notification Logic
+      if ("Notification" in window && Notification.permission === "granted") {
+        // Debounce logic can be added, currently sends on every render if low
+      }
+    }
   }, [data]);
 
+  // Request Notification Permission
+  useEffect(() => {
+    if ("Notification" in window) Notification.requestPermission();
+  }, []);
+
+  // Play Sound Function
+  const playAlertSound = () => {
+    if (audioRef.current) {
+      audioRef.current.play().catch(e => console.log("Audio play failed", e));
+    }
+    if ("Notification" in window && Notification.permission === "granted") {
+      new Notification("Stock Alert!", { body: "Kuch items khatam hone wale hain!" });
+    }
+  };
+
   const isDark = data.settings.theme === 'dark';
+  const t = (txt) => isHindi ? translateText(txt) : txt;
 
   // --- ACTIONS ---
+
   const handleAddPage = () => {
     if (!input.itemName) return;
-    const nextPageNo = data.pages.length + 1; // Automatic Page No
+    const nextPageNo = data.pages.length + 1;
     const newPage = { id: Date.now(), pageNo: nextPageNo, itemName: input.itemName };
     setData({ ...data, pages: [...data.pages, newPage] });
     setInput({ ...input, itemName: '' });
@@ -109,334 +134,293 @@ export default function AdvancedRegister() {
   };
 
   const updateQty = (id, amount) => {
-    setData({
-      ...data,
-      entries: data.entries.map(e => e.id === id ? { ...e, qty: Math.max(0, e.qty + amount) } : e)
+    const updatedEntries = data.entries.map(e => {
+      if (e.id === id) {
+        const newQty = Math.max(0, e.qty + amount);
+        // Check if just dropped below limit
+        if (newQty < data.settings.limit && e.qty >= data.settings.limit) {
+          playAlertSound();
+        }
+        return { ...e, qty: newQty };
+      }
+      return e;
     });
+    setData({ ...data, entries: updatedEntries });
   };
 
-  const deletePage = (id) => {
-    if(window.confirm(isHindi ? "Page delete karein?" : "Delete Page?")) {
-      // Re-order remaining pages logic can be added here, currently just deleting
-      setData({
-        ...data,
-        pages: data.pages.filter(p => p.id !== id),
-        entries: data.entries.filter(e => e.pageId !== id)
-      });
+  // --- SECURE SETTINGS ---
+  const unlockSettings = () => {
+    if (passInput === data.settings.password) {
+      setIsAuthenticated(true);
+      setShowPassModal(false);
+      setPassInput('');
+      setView('settings');
+    } else {
+      alert("Wrong Password!");
     }
   };
 
-  const deleteEntry = (id) => {
-    if(window.confirm("Delete?")) {
-      setData({ ...data, entries: data.entries.filter(e => e.id !== id) });
+  const changeSettingSecurely = (key, value) => {
+    if (window.confirm("Permission 1: Kya aap sach mein setting badalna chahte hain?")) {
+      if (window.confirm("Permission 2: Confirm karein?")) {
+        setData({ ...data, settings: { ...data.settings, [key]: value } });
+      }
     }
   };
 
-  // --- SEARCH LOGIC ---
-  const filteredEntries = useMemo(() => {
-    if (!searchTerm) return activePage ? data.entries.filter(e => e.pageId === activePage.id) : [];
-    
-    // Global Search or Page Search
-    let targetEntries = activePage 
-      ? data.entries.filter(e => e.pageId === activePage.id) 
-      : data.entries;
+  const changePassword = () => {
+    if (window.confirm("Permission 1: Password change karna hai?")) {
+      if (window.confirm("Permission 2: Purana password hat jayega. Confirm?")) {
+        setData({ ...data, settings: { ...data.settings, password: newPass } });
+        setNewPass('');
+        alert("Password Changed Successfully!");
+      }
+    }
+  };
 
-    return targetEntries.filter(e => 
-      e.car.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [data.entries, searchTerm, activePage]);
+  // --- VIEWS ---
 
-  // Low Stock Logic
-  const lowStockItems = data.entries.filter(e => e.qty < data.settings.limit);
-
-  // --- TRANSLATION HELPER ---
-  const t = (eng, hin) => isHindi ? hin : eng;
-
-  // --- RENDERERS ---
-
-  // 1. INDEX (REGISTER COVER)
-  const renderIndex = () => (
+  // 1. GENERAL INDEX (The "Copy" Index Page)
+  const renderGeneralIndex = () => (
     <div className="pb-24">
-      <div className={`${isDark ? 'bg-slate-800 border-slate-700' : 'bg-yellow-100 border-yellow-300'} p-4 border-b-2 sticky top-0 z-10 shadow-sm`}>
-        <div className="flex justify-between items-center">
-          <h1 className={`text-2xl font-extrabold ${isDark ? 'text-white' : 'text-yellow-900'} flex items-center gap-2 uppercase`}>
-            <Book/> {t("Index", "विषय सूची")}
+      {/* Index Header like a Physical Register */}
+      <div className={`p-6 border-b-4 border-double ${isDark ? 'bg-slate-800 border-slate-600' : 'bg-yellow-100 border-yellow-400'}`}>
+        <div className="flex justify-between items-center mb-4">
+          <h1 className={`text-3xl font-extrabold uppercase tracking-widest ${isDark ? 'text-white' : 'text-yellow-900'} underline decoration-2 decoration-red-400`}>
+            {t("General Index")}
           </h1>
-          <button onClick={() => setIsHindi(!isHindi)} className="p-2 bg-white/20 rounded-full">
-            <Languages size={20} className={isDark ? 'text-white' : 'text-yellow-900'}/>
+          <button onClick={() => setIsHindi(!isHindi)} className="bg-white/30 p-2 rounded-full border border-black/10">
+            <Languages size={24}/>
           </button>
         </div>
-        <p className={`text-xs font-bold mt-1 ${isDark ? 'text-slate-400' : 'text-yellow-800 opacity-70'}`}>
-          {t("Total Items/Pages:", "कुल पेज:")} {data.pages.length}
-        </p>
+        <p className="font-mono text-sm font-bold opacity-70">Authorized Register • Page 1 to {data.pages.length}</p>
       </div>
 
-      <div className="p-2">
-        <div className={`flex px-3 py-2 border-b-2 ${isDark ? 'border-slate-700 text-slate-400' : 'border-gray-300 text-gray-500'} text-xs font-bold uppercase`}>
-          <div className="w-12">{t("Pg.No", "पेज नं")}</div>
-          <div className="flex-1">{t("Item Name", "सामान का नाम")}</div>
-          <div className="w-16 text-center">{t("Qty", "मात्रा")}</div>
+      {/* Index Table */}
+      <div className={`m-2 border-2 ${isDark ? 'border-slate-700 bg-slate-900' : 'border-black bg-white'}`}>
+        {/* Table Header */}
+        <div className={`flex border-b-2 ${isDark ? 'border-slate-700 bg-slate-800' : 'border-black bg-gray-100'} p-2`}>
+          <div className="w-16 font-bold text-center border-r border-gray-400">S.No.</div>
+          <div className="flex-1 font-bold pl-3 border-r border-gray-400">{t("Particulars (Item Name)")}</div>
+          <div className="w-20 font-bold text-center">{t("Page No")}</div>
         </div>
 
-        <div className={`min-h-[60vh] shadow-sm border ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-gray-200'}`}>
-          {data.pages.map((page, index) => {
-            const total = data.entries.filter(e => e.pageId === page.id).reduce((a, b) => a + b.qty, 0);
-            return (
-              <div 
-                key={page.id} 
-                onClick={() => { setActivePage(page); setView('page'); setSearchTerm(''); }}
-                className={`flex items-center px-3 py-4 border-b cursor-pointer ${isDark ? 'border-slate-800 hover:bg-slate-800' : 'border-blue-100 hover:bg-blue-50'}`}
-              >
-                <div className="w-12 font-bold text-red-500 font-mono text-lg">{index + 1}</div>
-                <div className={`flex-1 font-bold text-lg leading-tight ${isDark ? 'text-white' : 'text-gray-800'}`}>
-                  {page.itemName}
-                </div>
-                <div className="w-16 text-center">
-                  <span className={`px-2 py-1 rounded font-bold text-sm ${isDark ? 'bg-slate-700 text-white' : 'bg-gray-200 text-gray-800'}`}>
-                    {total}
-                  </span>
-                </div>
-                <ChevronRight className="text-gray-300" size={20}/>
+        {/* Rows */}
+        <div className="min-h-[60vh]">
+          {data.pages.map((page, idx) => (
+            <div 
+              key={page.id}
+              onClick={() => { setActivePage(page); setView('page'); }}
+              className={`flex border-b border-gray-300 cursor-pointer hover:bg-blue-50 transition-colors h-12 items-center ${isDark ? 'text-white hover:bg-slate-800' : 'text-black'}`}
+            >
+              <div className="w-16 text-center font-bold text-red-600 border-r border-gray-300 h-full flex items-center justify-center">
+                {idx + 1}
               </div>
-            )
-          })}
+              <div className="flex-1 pl-3 font-semibold text-lg border-r border-gray-300 h-full flex items-center truncate">
+                {t(page.itemName)}
+              </div>
+              <div className="w-20 text-center font-bold text-blue-700 h-full flex items-center justify-center underline">
+                {page.pageNo}
+              </div>
+            </div>
+          ))}
+          
+          {/* Empty Lines for aesthetics */}
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className={`h-10 border-b ${isDark ? 'border-slate-800' : 'border-gray-200'}`}></div>
+          ))}
         </div>
       </div>
 
-      <button onClick={() => setIsNewPageOpen(true)} className="fixed bottom-24 right-6 bg-yellow-500 text-yellow-900 w-16 h-16 rounded-full shadow-lg border-4 border-white flex items-center justify-center active:scale-95 z-20">
+      <button onClick={() => setIsNewPageOpen(true)} className="fixed bottom-24 right-6 bg-yellow-500 text-black w-16 h-16 rounded-full shadow-xl border-4 border-white flex items-center justify-center active:scale-95 z-20">
         <Plus size={32} strokeWidth={3}/>
       </button>
     </div>
   );
 
   // 2. PAGE VIEW
-  const renderPage = () => (
-    <div className={`pb-24 min-h-screen ${isDark ? 'bg-slate-950' : 'bg-white'}`}>
-      {/* Header */}
-      <div className={`sticky top-0 z-10 border-b-2 shadow-sm ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-red-200'}`}>
-        <div className={`flex items-center gap-2 p-3 ${isDark ? 'bg-slate-900' : 'bg-red-50'}`}>
-           <button onClick={() => setView('index')} className="p-2 -ml-2"><ArrowLeft size={24} className={isDark ? 'text-white' : 'text-red-900'}/></button>
-           <div className="flex-1">
-             <p className={`text-xs font-bold uppercase ${isDark ? 'text-slate-400' : 'text-red-400'}`}>
-               {t("Page No.", "पेज नं.")} {data.pages.indexOf(activePage) + 1}
-             </p>
-             <h2 className={`text-xl font-black uppercase tracking-tight leading-none ${isDark ? 'text-white' : 'text-red-900'}`}>
-               {activePage.itemName}
-             </h2>
+  const renderPage = () => {
+    const pageEntries = data.entries.filter(e => e.pageId === activePage.id);
+    // Filter on Page
+    const filtered = pageEntries.filter(e => e.car.toLowerCase().includes(searchTerm.toLowerCase()));
+
+    return (
+      <div className={`pb-24 min-h-screen ${isDark ? 'bg-slate-950 text-white' : 'bg-white text-black'}`}>
+        {/* Notebook Header */}
+        <div className={`sticky top-0 z-10 border-b-2 shadow-sm ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-red-200'}`}>
+           <div className={`flex items-center p-3 ${isDark ? 'bg-slate-800' : 'bg-red-50'}`}>
+              <button onClick={() => setView('generalIndex')} className="mr-2"><ArrowLeft/></button>
+              <div className="flex-1">
+                 <p className="text-xs font-bold uppercase text-red-400">{t("Page No")}: {activePage.pageNo}</p>
+                 <h2 className="text-2xl font-black uppercase">{t(activePage.itemName)}</h2>
+              </div>
+              <div className="flex gap-2">
+                 <button onClick={() => {if(window.confirm("Delete Page?")) {
+                    setData({...data, pages: data.pages.filter(p=>p.id!==activePage.id)});
+                    setView('generalIndex');
+                 }}} className="text-red-400"><Trash2/></button>
+              </div>
            </div>
-           <button onClick={() => deletePage(activePage.id)} className="text-red-300 p-2"><Trash2 size={20}/></button>
+           
+           {/* Search & Translate */}
+           <div className={`p-2 flex gap-2 border-t ${isDark ? 'border-slate-700' : 'border-gray-100'}`}>
+              <div className="relative flex-1">
+                 <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" size={16}/>
+                 <input 
+                   className={`w-full pl-8 py-2 rounded border outline-none ${isDark ? 'bg-slate-900 border-slate-600' : 'bg-gray-50 border-gray-300'}`}
+                   placeholder={t("Search Item...")}
+                   value={searchTerm}
+                   onChange={e => setSearchTerm(e.target.value)}
+                 />
+              </div>
+              <VoiceInput onResult={setSearchTerm} isDark={isDark}/>
+           </div>
+
+           {/* Columns */}
+           <div className={`flex p-2 text-xs font-bold uppercase ${isDark ? 'bg-slate-700' : 'bg-red-100 text-red-900'}`}>
+             <div className="flex-[2]">{t("Car Name")}</div>
+             <div className="flex-[1] text-center">{t("Qty")}</div>
+           </div>
         </div>
-        
-        {/* Search Bar on Page */}
-        <div className={`p-2 flex gap-2 ${isDark ? 'bg-slate-800' : 'bg-white'}`}>
-          <div className="relative flex-1">
-            <input 
-              type="text" 
-              placeholder={t("Search on this page...", "इस पेज पर ढूंढें...")}
-              className={`w-full pl-9 pr-2 py-2 rounded-lg border outline-none ${isDark ? 'bg-slate-900 border-slate-700 text-white' : 'border-gray-300 text-black'}`}
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-            />
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" size={18}/>
-          </div>
-          <VoiceInput onResult={setSearchTerm} isDark={isDark} />
-        </div>
 
-        {/* Column Headers */}
-        <div className={`flex p-2 text-xs font-bold uppercase ${isDark ? 'bg-slate-800 text-slate-300' : 'bg-red-100 text-red-900'}`}>
-          <div className="flex-[2]">{t("Car Name", "गाड़ी का नाम")}</div>
-          <div className="flex-[1.5] text-center">{t("Qty", "मात्रा")}</div>
-        </div>
-      </div>
-
-      {/* Lines Grid */}
-      <div className="w-full" style={isDark ? {} : { backgroundImage: 'linear-gradient(#e5e7eb 1px, transparent 1px)', backgroundSize: '100% 3.5rem' }}>
-        {filteredEntries.map((entry) => (
-          <div key={entry.id} className={`flex items-center px-4 h-14 border-b ${isDark ? 'border-slate-800' : 'border-transparent'}`}>
-            <div className="flex-[2] flex items-center justify-between pr-2">
-               <span className={`text-lg font-bold ${isDark ? 'text-slate-200' : 'text-gray-800'}`}>{entry.car}</span>
-               <button onClick={() => deleteEntry(entry.id)} className="text-gray-300 opacity-50 hover:opacity-100"><X size={16}/></button>
-            </div>
-            <div className="flex-[1.5] flex items-center justify-center gap-3">
-               <button onClick={() => updateQty(entry.id, -1)} className={`w-8 h-8 flex items-center justify-center rounded-full border ${isDark ? 'bg-slate-800 border-slate-600 text-red-400' : 'bg-gray-100 border-gray-300 text-red-600'}`}><Minus size={16}/></button>
-               <span className={`text-xl font-bold font-mono w-8 text-center ${entry.qty < data.settings.limit ? 'text-red-500 animate-pulse' : (isDark ? 'text-white' : 'text-black')}`}>{entry.qty}</span>
-               <button onClick={() => updateQty(entry.id, 1)} className={`w-8 h-8 flex items-center justify-center rounded-full border ${isDark ? 'bg-slate-800 border-slate-600 text-green-400' : 'bg-gray-100 border-gray-300 text-green-600'}`}><Plus size={16}/></button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <button onClick={() => setIsNewEntryOpen(true)} className="fixed bottom-24 right-6 bg-blue-600 text-white w-16 h-16 rounded-full shadow-lg border-4 border-white flex items-center justify-center active:scale-95 z-20">
-        <Plus size={32} strokeWidth={3}/>
-      </button>
-    </div>
-  );
-
-  // 3. LOW STOCK ALERT VIEW
-  const renderAlerts = () => (
-    <div className="p-4 pb-24">
-      <h2 className={`text-2xl font-bold mb-4 flex items-center gap-2 ${isDark ? 'text-white' : 'text-red-700'}`}>
-        <AlertTriangle/> {t("Low Stock Alerts", "खत्म होने वाला माल")}
-      </h2>
-      <p className={`text-sm mb-4 ${isDark ? 'text-slate-400' : 'text-gray-600'}`}>
-        {t(`Showing items below ${data.settings.limit} qty.`, `${data.settings.limit} से कम वाले आइटम दिख रहे हैं.`)}
-      </p>
-
-      <div className="space-y-3">
-        {lowStockItems.length === 0 && <div className="text-center p-10 text-gray-400">{t("All Good! Stock is full.", "सब ठीक है! स्टॉक फुल है.")}</div>}
-        
-        {lowStockItems.map(item => {
-           const page = data.pages.find(p => p.id === item.pageId);
-           return (
-             <div key={item.id} onClick={() => { setActivePage(page); setView('page'); }} className={`p-4 rounded-lg border-l-4 border-red-500 shadow-sm cursor-pointer ${isDark ? 'bg-slate-800 text-white' : 'bg-white'}`}>
-               <div className="flex justify-between items-start">
-                 <div>
-                   <h3 className="font-bold text-lg">{page?.itemName}</h3>
-                   <div className="flex items-center gap-2 text-sm opacity-80 mt-1">
-                     <Car size={16}/> {item.car}
-                   </div>
-                 </div>
-                 <div className="text-right">
-                   <span className="text-3xl font-bold text-red-500">{item.qty}</span>
-                   <p className="text-[10px] uppercase font-bold text-red-400">Left</p>
-                 </div>
-               </div>
-               <div className="mt-2 text-xs opacity-50 uppercase font-bold text-right">
-                 {t("Page No:", "पेज नं:")} {data.pages.indexOf(page) + 1}
-               </div>
-             </div>
-           )
-        })}
-      </div>
-    </div>
-  );
-
-  // 4. SETTINGS VIEW
-  const renderSettings = () => (
-    <div className="p-4 pb-24">
-      <h2 className={`text-2xl font-bold mb-6 flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-800'}`}>
-        <Settings/> {t("Settings", "सेटिंग्स")}
-      </h2>
-
-      <div className={`p-5 rounded-xl border mb-4 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}>
-        <label className={`block text-sm font-bold uppercase mb-2 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
-          {t("Low Stock Limit (Alert)", "स्टॉक अलर्ट लिमिट")}
-        </label>
-        <div className="flex items-center gap-4">
-          <input 
-            type="range" min="1" max="20" 
-            value={data.settings.limit} 
-            onChange={e => setData({...data, settings: {...data.settings, limit: parseInt(e.target.value)}})}
-            className="flex-1 h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer"
-          />
-          <span className={`text-2xl font-bold w-12 text-center ${isDark ? 'text-white' : 'text-black'}`}>{data.settings.limit}</span>
-        </div>
-        <p className="text-xs text-gray-400 mt-2">{t("Alert when stock goes below this number.", "जब माल इस नंबर से कम होगा तो लाल रंग का अलर्ट आएगा.")}</p>
-      </div>
-
-      <div className={`p-5 rounded-xl border mb-4 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}>
-        <label className={`block text-sm font-bold uppercase mb-4 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
-          {t("App Theme", "थीम")}
-        </label>
-        <div className="flex gap-4">
-          <button 
-            onClick={() => setData({...data, settings: {...data.settings, theme: 'light'}})}
-            className={`flex-1 py-3 rounded-lg font-bold border-2 ${!isDark ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-600 text-gray-400'}`}
-          >
-            Light
-          </button>
-          <button 
-            onClick={() => setData({...data, settings: {...data.settings, theme: 'dark'}})}
-            className={`flex-1 py-3 rounded-lg font-bold border-2 ${isDark ? 'border-blue-500 bg-slate-700 text-white' : 'border-gray-200 text-gray-400'}`}
-          >
-            Dark
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
-  // 5. CAR FINDER VIEW
-  const renderFinder = () => (
-    <div className="p-4 pb-24">
-      <div className={`sticky top-0 p-4 border-b rounded-xl shadow-sm z-10 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}>
-        <h2 className={`text-lg font-bold mb-3 flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-800'}`}>
-          <Car className="text-blue-500"/> {t("Car Finder", "गाड़ी से ढूंढें")}
-        </h2>
-        <div className="flex gap-2">
-            <div className="relative flex-1">
-                <input 
-                    autoFocus
-                    type="text" 
-                    placeholder={t("Car Name (e.g. Swift)...", "गाड़ी का नाम...")}
-                    className={`w-full p-3 pl-10 border rounded-lg outline-none ${isDark ? 'bg-slate-900 border-slate-600 text-white' : 'border-gray-300 text-black'}`}
-                    value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
-                />
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20}/>
-            </div>
-            <VoiceInput onResult={setSearchTerm} isDark={isDark} />
-        </div>
-      </div>
-
-      <div className="mt-4 space-y-3">
-         {searchTerm && filteredEntries.map(entry => {
-             const page = data.pages.find(p => p.id === entry.pageId);
-             return (
-                <div key={entry.id} onClick={() => { setActivePage(page); setView('page'); }} className={`p-4 rounded-lg border shadow-sm flex justify-between items-center cursor-pointer ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-gray-200'}`}>
-                    <div>
-                        <h3 className="font-bold text-blue-500 text-lg">{page.itemName}</h3>
-                        <p className="text-sm font-bold opacity-70">{entry.car}</p>
-                    </div>
-                    <div className="text-right">
-                        <span className={`px-3 py-1 rounded text-sm font-bold ${entry.qty < data.settings.limit ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
-                            {entry.qty}
-                        </span>
-                        <p className="text-[10px] uppercase font-bold mt-1 opacity-50">{t("Page", "पेज")} {data.pages.indexOf(page) + 1}</p>
-                    </div>
+        {/* Lines */}
+        <div style={isDark ? {} : { backgroundImage: 'linear-gradient(#e5e7eb 1px, transparent 1px)', backgroundSize: '100% 3.5rem' }}>
+          {filtered.map(entry => (
+             <div key={entry.id} className={`flex items-center px-4 h-14 border-b ${isDark ? 'border-slate-800' : 'border-transparent'}`}>
+                <div className="flex-[2] text-lg font-bold">
+                   {t(entry.car)}
                 </div>
-             )
-         })}
+                <div className="flex-[1] flex items-center justify-center gap-3">
+                   <button onClick={() => updateQty(entry.id, -1)} className="w-8 h-8 rounded-full border bg-gray-100 text-red-600 flex items-center justify-center"><Minus size={16}/></button>
+                   <span className={`text-xl font-mono font-bold ${entry.qty < data.settings.limit ? 'text-red-500 animate-pulse' : ''}`}>{entry.qty}</span>
+                   <button onClick={() => updateQty(entry.id, 1)} className="w-8 h-8 rounded-full border bg-gray-100 text-green-600 flex items-center justify-center"><Plus size={16}/></button>
+                </div>
+             </div>
+          ))}
+        </div>
+
+        <button onClick={() => setIsNewEntryOpen(true)} className="fixed bottom-24 right-6 bg-blue-600 text-white w-14 h-14 rounded-full shadow-lg border-2 border-white flex items-center justify-center z-20">
+           <Plus size={28}/>
+        </button>
       </div>
+    );
+  };
+
+  // 3. SETTINGS VIEW (Protected)
+  const renderSettings = () => (
+    <div className={`p-4 pb-24 min-h-screen ${isDark ? 'bg-slate-900 text-white' : 'bg-gray-50 text-black'}`}>
+       <h2 className="text-2xl font-bold mb-6 flex items-center gap-2"><Settings/> {t("Settings")}</h2>
+       
+       {/* Limit */}
+       <div className={`p-4 rounded-xl border mb-4 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-300'}`}>
+          <label className="font-bold block mb-2">{t("Low Stock Limit Alert")}</label>
+          <div className="flex items-center gap-4">
+             <input 
+               type="range" min="1" max="20" 
+               value={data.settings.limit}
+               onChange={(e) => changeSettingSecurely('limit', parseInt(e.target.value))}
+               className="flex-1"
+             />
+             <span className="text-2xl font-bold">{data.settings.limit}</span>
+          </div>
+       </div>
+
+       {/* Theme */}
+       <div className={`p-4 rounded-xl border mb-4 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-300'}`}>
+          <label className="font-bold block mb-2">{t("Theme")}</label>
+          <div className="flex gap-2">
+             <button onClick={() => changeSettingSecurely('theme', 'light')} className="flex-1 py-2 border rounded font-bold">Light</button>
+             <button onClick={() => changeSettingSecurely('theme', 'dark')} className="flex-1 py-2 border bg-slate-700 text-white rounded font-bold">Dark</button>
+          </div>
+       </div>
+
+       {/* Password Change */}
+       <div className={`p-4 rounded-xl border mb-4 border-red-300 ${isDark ? 'bg-slate-800' : 'bg-red-50'}`}>
+          <label className="font-bold block mb-2 text-red-600">{t("Change Password")}</label>
+          <input 
+             type="text" 
+             placeholder="New Password" 
+             className="w-full p-2 border rounded mb-2 text-black"
+             value={newPass}
+             onChange={e => setNewPass(e.target.value)}
+          />
+          <button onClick={changePassword} className="w-full py-2 bg-red-600 text-white font-bold rounded">Update Password</button>
+       </div>
+
+       <button onClick={() => { setIsAuthenticated(false); setView('generalIndex'); }} className="w-full py-3 border-2 border-gray-400 rounded-lg font-bold text-gray-500 flex items-center justify-center gap-2">
+         <LogOut size={20}/> Lock Settings
+       </button>
     </div>
   );
 
   return (
-    <div className={`min-h-screen font-sans ${isDark ? 'bg-slate-950 text-slate-100' : 'bg-gray-50 text-gray-900'}`}>
+    <div className={`min-h-screen font-sans ${isDark ? 'bg-slate-950' : 'bg-white'}`}>
       
-      {view === 'index' && renderIndex()}
+      {/* Hidden Audio Element for Alerts */}
+      <audio ref={audioRef} src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" preload="auto"></audio>
+
+      {/* VIEW SWITCHER */}
+      {view === 'generalIndex' && renderGeneralIndex()}
       {view === 'page' && renderPage()}
-      {view === 'alert' && renderAlerts()}
       {view === 'settings' && renderSettings()}
-      {view === 'finder' && renderFinder()}
+      
+      {/* ALERTS TAB (Combined with Render logic to save space) */}
+      {view === 'alerts' && (
+         <div className={`p-4 pb-24 ${isDark ? 'text-white' : ''}`}>
+            <h2 className="text-2xl font-bold text-red-500 mb-4 flex items-center gap-2"><AlertTriangle/> {t("Low Stock")}</h2>
+            {data.entries.filter(e => e.qty < data.settings.limit).map(e => {
+               const p = data.pages.find(page => page.id === e.pageId);
+               return (
+                  <div key={e.id} className="p-4 border-l-4 border-red-500 bg-white text-black shadow mb-2 rounded flex justify-between items-center" onClick={() => {setActivePage(p); setView('page')}}>
+                     <div><h3 className="font-bold">{t(e.car)}</h3><p className="text-xs">{t(p?.itemName)}</p></div>
+                     <span className="text-2xl font-bold text-red-600">{e.qty}</span>
+                  </div>
+               )
+            })}
+         </div>
+      )}
 
       {/* BOTTOM NAV */}
       <div className={`fixed bottom-0 w-full border-t flex justify-around p-2 pb-safe z-50 ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-300'}`}>
-        <NavBtn icon={Book} label={t("Index", "इंडेक्स")} active={view === 'index'} onClick={() => setView('index')} isDark={isDark}/>
-        <NavBtn icon={Car} label={t("Finder", "खोजें")} active={view === 'finder'} onClick={() => {setView('finder'); setSearchTerm('')}} isDark={isDark}/>
-        <NavBtn icon={AlertTriangle} label={t("Alerts", "अलर्ट")} active={view === 'alert'} onClick={() => setView('alert')} alert={lowStockItems.length > 0} isDark={isDark}/>
-        <NavBtn icon={Settings} label={t("Settings", "सेटिंग")} active={view === 'settings'} onClick={() => setView('settings')} isDark={isDark}/>
+         <button onClick={() => setView('generalIndex')} className={`flex flex-col items-center p-2 rounded ${view === 'generalIndex' ? 'text-blue-600' : 'text-gray-400'}`}>
+            <Book size={24}/><span className="text-[10px] font-bold">{t("Index")}</span>
+         </button>
+         <button onClick={() => setView('alerts')} className={`flex flex-col items-center p-2 rounded ${view === 'alerts' ? 'text-red-600' : 'text-gray-400'}`}>
+            <div className="relative"><Bell size={24}/>{data.entries.some(e => e.qty < data.settings.limit) && <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full animate-ping"></span>}</div>
+            <span className="text-[10px] font-bold">{t("Alerts")}</span>
+         </button>
+         <button onClick={() => setShowPassModal(true)} className={`flex flex-col items-center p-2 rounded ${view === 'settings' ? 'text-blue-600' : 'text-gray-400'}`}>
+            <Settings size={24}/><span className="text-[10px] font-bold">{t("Settings")}</span>
+         </button>
       </div>
+
+      {/* PASSWORD MODAL */}
+      {showPassModal && (
+         <div className="fixed inset-0 bg-black/80 z-[70] flex items-center justify-center p-6">
+            <div className="bg-white p-6 rounded-xl w-full max-w-xs text-center">
+               <Lock className="mx-auto mb-4 text-blue-600" size={32}/>
+               <h3 className="text-lg font-bold mb-2">Enter Password</h3>
+               <input type="password" value={passInput} onChange={e => setPassInput(e.target.value)} className="border-2 border-black rounded p-2 text-center text-xl w-full mb-4 text-black"/>
+               <div className="flex gap-2">
+                  <button onClick={() => setShowPassModal(false)} className="flex-1 bg-gray-200 py-2 rounded font-bold text-black">Cancel</button>
+                  <button onClick={unlockSettings} className="flex-1 bg-blue-600 text-white py-2 rounded font-bold">Unlock</button>
+               </div>
+            </div>
+         </div>
+      )}
 
       {/* NEW PAGE MODAL */}
       {isNewPageOpen && (
         <div className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4">
-          <div className={`w-full max-w-sm rounded-xl p-6 ${isDark ? 'bg-slate-900' : 'bg-white'}`}>
-            <h3 className="text-xl font-bold mb-4">{t("New Page (Item)", "नया पेज (सामान)")}</h3>
-            <p className="text-xs mb-2 font-bold opacity-50 uppercase">{t("Auto Page No:", "ऑटो पेज नं:")} {data.pages.length + 1}</p>
+          <div className="bg-white w-full max-w-sm rounded-xl p-6">
+            <h3 className="text-xl font-bold mb-4 text-black">{t("New Item Page")}</h3>
             <div className="flex gap-2 mb-4">
-                <input 
-                autoFocus
-                className={`flex-1 border-2 rounded-lg p-3 text-lg font-bold outline-none ${isDark ? 'bg-slate-800 border-slate-600 text-white' : 'border-gray-300 text-black'}`}
-                placeholder="Item Name"
-                value={input.itemName}
-                onChange={e => setInput({...input, itemName: e.target.value})}
-                />
-                <div className="flex items-center"><VoiceInput onResult={(txt) => setInput(prev => ({...prev, itemName: txt}))} isDark={isDark} /></div>
+                <input autoFocus className="flex-1 border-2 border-black rounded-lg p-3 text-lg font-bold text-black" placeholder="Item Name" value={input.itemName} onChange={e => setInput({...input, itemName: e.target.value})} />
+                <VoiceInput onResult={(txt) => setInput(prev => ({...prev, itemName: txt}))} isDark={false} />
             </div>
             <div className="flex gap-3">
-              <button onClick={() => setIsNewPageOpen(false)} className={`flex-1 py-3 rounded-lg font-bold ${isDark ? 'bg-slate-800' : 'bg-gray-200 text-gray-600'}`}>{t("Cancel", "रद्द करें")}</button>
-              <button onClick={handleAddPage} className="flex-1 py-3 bg-yellow-500 text-yellow-900 rounded-lg font-bold">{t("Create Page", "पेज बनाएं")}</button>
+               <button onClick={() => setIsNewPageOpen(false)} className="flex-1 py-3 bg-gray-200 rounded font-bold text-black">Cancel</button>
+               <button onClick={handleAddPage} className="flex-1 py-3 bg-yellow-500 text-black rounded font-bold">Add</button>
             </div>
           </div>
         </div>
@@ -445,39 +429,19 @@ export default function AdvancedRegister() {
       {/* NEW ENTRY MODAL */}
       {isNewEntryOpen && (
         <div className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4">
-          <div className={`w-full max-w-sm rounded-xl p-6 ${isDark ? 'bg-slate-900' : 'bg-white'}`}>
-            <h3 className="text-xl font-bold mb-1">{t("New Entry", "नई एंट्री")}</h3>
-            <p className="text-sm font-bold opacity-50 mb-4">{activePage?.itemName}</p>
-            
+          <div className="bg-white w-full max-w-sm rounded-xl p-6">
+            <h3 className="text-xl font-bold mb-1 text-black">{t("New Entry")}</h3>
+            <p className="text-sm font-bold opacity-50 mb-4 text-black">{activePage?.itemName}</p>
             <div className="space-y-4">
-              <div>
-                <label className="text-xs font-bold opacity-50 uppercase">{t("Car Name", "गाड़ी का नाम")}</label>
-                <div className="flex gap-2 mt-1">
-                    <input 
-                    autoFocus
-                    className={`flex-1 border-2 rounded-lg p-3 text-lg font-bold outline-none ${isDark ? 'bg-slate-800 border-slate-600 text-white' : 'border-gray-300 text-black'}`}
-                    placeholder="e.g. Swift"
-                    value={input.carName}
-                    onChange={e => setInput({...input, carName: e.target.value})}
-                    />
-                    <div className="flex items-center"><VoiceInput onResult={(txt) => setInput(prev => ({...prev, carName: txt}))} isDark={isDark} /></div>
-                </div>
+              <div className="flex gap-2">
+                 <input autoFocus className="flex-1 border-2 border-black rounded p-3 text-lg font-bold text-black" placeholder="Car Name" value={input.carName} onChange={e => setInput({...input, carName: e.target.value})} />
+                 <VoiceInput onResult={(txt) => setInput(prev => ({...prev, carName: txt}))} isDark={false} />
               </div>
-              <div>
-                <label className="text-xs font-bold opacity-50 uppercase">{t("Quantity", "मात्रा")}</label>
-                <input 
-                  type="number"
-                  className={`w-full border-2 rounded-lg p-3 text-lg font-bold mt-1 outline-none ${isDark ? 'bg-slate-800 border-slate-600 text-white' : 'border-gray-300 text-black'}`}
-                  placeholder="0"
-                  value={input.qty}
-                  onChange={e => setInput({...input, qty: e.target.value})}
-                />
-              </div>
+              <input type="number" className="w-full border-2 border-black rounded p-3 text-lg font-bold text-black" placeholder="Qty" value={input.qty} onChange={e => setInput({...input, qty: e.target.value})} />
             </div>
-
             <div className="flex gap-3 mt-6">
-              <button onClick={() => setIsNewEntryOpen(false)} className={`flex-1 py-3 rounded-lg font-bold ${isDark ? 'bg-slate-800' : 'bg-gray-200 text-gray-600'}`}>{t("Cancel", "रद्द करें")}</button>
-              <button onClick={handleAddEntry} className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-bold">{t("Save", "सेव करें")}</button>
+              <button onClick={() => setIsNewEntryOpen(false)} className="flex-1 py-3 bg-gray-200 rounded font-bold text-black">Cancel</button>
+              <button onClick={handleAddEntry} className="flex-1 py-3 bg-blue-600 text-white rounded font-bold">Save</button>
             </div>
           </div>
         </div>
@@ -485,11 +449,3 @@ export default function AdvancedRegister() {
     </div>
   );
 }
-
-const NavBtn = ({ icon: Icon, label, active, onClick, alert, isDark }) => (
-  <button onClick={onClick} className={`relative flex flex-col items-center p-2 rounded-xl transition-all ${active ? 'text-blue-600 bg-blue-50 dark:bg-slate-800 dark:text-blue-400' : 'text-gray-400 dark:text-slate-500'}`}>
-    <Icon size={24} strokeWidth={active ? 2.5 : 2} />
-    <span className="text-[10px] font-bold mt-1">{label}</span>
-    {alert && <span className="absolute top-1 right-3 w-3 h-3 bg-red-500 rounded-full border-2 border-white animate-bounce"></span>}
-  </button>
-);
