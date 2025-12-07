@@ -27,7 +27,8 @@ import {
   Send,
   Lock,
   User,
-  CheckCircle
+  CheckCircle,
+  MoreVertical
 } from 'lucide-react';
 
 // --- DATA PERSISTENCE HELPERS ---
@@ -56,77 +57,37 @@ const initialTransactions = [
   { id: 102, type: 'Restock', productName: 'Car Body Cover', amount: 0, date: 'Yesterday, 6:00 PM' }
 ];
 
-// --- IMPROVED VOICE INPUT COMPONENT ---
+// --- VOICE INPUT COMPONENT (Optimized) ---
 const VoiceInput = ({ onResult, isDark }) => {
   const [isListening, setIsListening] = useState(false);
-  const [error, setError] = useState(null);
 
   const startListening = () => {
-    setError(null);
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       const recognition = new SpeechRecognition();
-      
-      // Upgrade: Better config for Hindi & Noise
       recognition.lang = 'hi-IN'; 
-      recognition.continuous = false; // Stops automatically after speaking
-      recognition.interimResults = false; // Waits for final result to reduce noise errors
-      recognition.maxAlternatives = 1;
+      recognition.continuous = false;
+      recognition.interimResults = false;
 
       recognition.onstart = () => setIsListening(true);
-      
-      recognition.onend = () => {
-        setIsListening(false);
-      };
-
-      recognition.onerror = (event) => {
-        console.error("Voice error:", event.error);
-        setIsListening(false);
-        setError("Mic Error");
-        setTimeout(() => setError(null), 2000);
-      };
-
+      recognition.onend = () => setIsListening(false);
       recognition.onresult = (event) => {
         const transcript = event.results[0][0].transcript;
-        if(transcript) {
-            onResult(transcript);
-        }
+        if(transcript) onResult(transcript);
       };
-      
-      try {
-        recognition.start();
-      } catch (e) {
-        console.error(e);
-      }
+      try { recognition.start(); } catch(e) { console.error(e); }
     } else {
-      alert("Voice search not supported in this browser.");
+      alert("Voice not supported.");
     }
   };
 
   return (
-    <div className="relative">
-        <button
-        onClick={startListening}
-        className={`p-2 rounded-full transition-all duration-200 ${
-            isListening 
-            ? 'bg-red-500 text-white animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.5)]' 
-            : (isDark ? 'text-slate-400 hover:text-white hover:bg-slate-700' : 'text-slate-400 hover:text-blue-600 hover:bg-blue-50')
-        }`}
-        title="Speak (Hindi/English)"
-        >
-        <Mic size={20} />
-        </button>
-        {isListening && (
-            <span className="absolute -top-8 left-1/2 -translate-x-1/2 text-[10px] bg-red-500 text-white px-2 py-0.5 rounded whitespace-nowrap">
-                Sun raha hu...
-            </span>
-        )}
-        {error && (
-             <span className="absolute -top-8 left-1/2 -translate-x-1/2 text-[10px] bg-slate-700 text-white px-2 py-0.5 rounded whitespace-nowrap">
-             Retry
-         </span>
-        )}
-    </div>
+    <button
+      onClick={startListening}
+      className={`p-3 rounded-full transition-all active:scale-90 ${isListening ? 'bg-red-500 text-white animate-pulse' : (isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600')}`}
+    >
+      <Mic size={20} />
+    </button>
   );
 };
 
@@ -147,52 +108,25 @@ const LoginScreen = ({ onLogin }) => {
 
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-      <div className="bg-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-md border border-slate-700 animate-scale-in">
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-blue-600 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-500/20">
-             <span className="text-white font-bold text-2xl">AH</span>
+      <div className="bg-slate-800 p-6 md:p-8 rounded-2xl shadow-2xl w-full max-w-sm border border-slate-700">
+        <div className="text-center mb-6">
+          <div className="w-14 h-14 bg-blue-600 rounded-xl flex items-center justify-center mx-auto mb-3 shadow-lg shadow-blue-500/20">
+             <span className="text-white font-bold text-xl">AH</span>
           </div>
-          <h1 className="text-2xl font-bold text-white">Welcome Back</h1>
-          <p className="text-slate-400 mt-2">Sign in to AutoHub Enterprise</p>
+          <h1 className="text-xl font-bold text-white">AutoHub Login</h1>
         </div>
-
-        <form onSubmit={handleLogin} className="space-y-6">
+        <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-slate-400 text-sm font-bold mb-2 uppercase">Username</label>
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-              <input 
-                type="text" 
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-600 rounded-lg py-3 pl-10 pr-4 text-white focus:outline-none focus:border-blue-500 transition-colors"
-                placeholder="Enter username"
-              />
-            </div>
+            <label className="block text-slate-400 text-xs font-bold mb-1 uppercase">Username</label>
+            <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg py-3 px-4 text-white focus:outline-none focus:border-blue-500" placeholder="admin" />
           </div>
           <div>
-            <label className="block text-slate-400 text-sm font-bold mb-2 uppercase">Password</label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-              <input 
-                type="password" 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-600 rounded-lg py-3 pl-10 pr-4 text-white focus:outline-none focus:border-blue-500 transition-colors"
-                placeholder="Enter password"
-              />
-            </div>
+            <label className="block text-slate-400 text-xs font-bold mb-1 uppercase">Password</label>
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg py-3 px-4 text-white focus:outline-none focus:border-blue-500" placeholder="password123" />
           </div>
-          
-          {error && <div className="text-red-400 text-sm text-center bg-red-900/20 p-2 rounded border border-red-900/50">{error}</div>}
-
-          <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition-all shadow-lg shadow-blue-600/20 active:scale-95">
-            Secure Login
-          </button>
+          {error && <div className="text-red-400 text-xs text-center">{error}</div>}
+          <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition-all active:scale-95">Login</button>
         </form>
-        <div className="mt-6 text-center text-xs text-slate-500">
-          <p>Protected by Enterprise Guard AI</p>
-        </div>
       </div>
     </div>
   );
@@ -202,40 +136,24 @@ const LoginScreen = ({ onLogin }) => {
 const AIChatBot = ({ products, transactions, isDark, businessName }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const [messages, setMessages] = useState([
-    { role: 'ai', text: `Namaste! Main ${businessName} ka AI Assistant hu. Stock, price ya sales ke baare mein kuch bhi puchiye.` }
-  ]);
+  const [messages, setMessages] = useState([{ role: 'ai', text: `Namaste! Stock ya sales ke baare mein puchiye.` }]);
   const messagesEndRef = useRef(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, isOpen]);
+  const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  useEffect(() => scrollToBottom(), [messages, isOpen]);
 
   const processQuery = (text) => {
     const lowerText = text.toLowerCase();
-    let response = "Maaf kijiye, mujhe samajh nahi aaya. Kripya products, stock ya sales ke baare mein puchiye.";
-
-    if (lowerText.includes('total stock') || lowerText.includes('kitne item') || lowerText.includes('kul stock')) {
-      const totalStock = products.reduce((acc, p) => acc + p.stock, 0);
-      response = `Humare paas kul ${products.length} alag products hain, aur total ${totalStock} units stock mein hain.`;
-    } 
-    else if (lowerText.includes('sale') || lowerText.includes('kamai') || lowerText.includes('revenue') || lowerText.includes('bikri')) {
-      const totalSales = transactions.filter(t => t.type === 'Sale').reduce((acc, t) => acc + t.amount, 0);
-      response = `Aaj ki total sales abhi tak ₹${totalSales.toLocaleString()} hui hai.`;
-    }
-    else if (lowerText.includes('low') || lowerText.includes('kam') || lowerText.includes('khatam')) {
-      const lowStock = products.filter(p => p.stock < 5).map(p => p.name).join(', ');
-      response = lowStock ? `Ye items khatam hone wale hain: ${lowStock}` : "Sabhi items ka stock sufficient hai.";
-    }
-    else {
-      const foundProduct = products.find(p => lowerText.includes(p.name.toLowerCase().split(' ')[0].toLowerCase()));
-      if (foundProduct) {
-        response = `${foundProduct.name} ka price ₹${foundProduct.price} hai aur abhi ${foundProduct.stock} units available hain. Ye ${foundProduct.compatibleCars.join(', ')} ke liye compatible hai.`;
-      }
+    let response = "Samajh nahi aaya. Stock ya sales puchiye.";
+    if (lowerText.includes('total') || lowerText.includes('stock')) {
+      const total = products.reduce((a, p) => a + p.stock, 0);
+      response = `Total stock: ${total} units.`;
+    } else if (lowerText.includes('sale') || lowerText.includes('bikri')) {
+      const total = transactions.filter(t => t.type === 'Sale').reduce((a, t) => a + t.amount, 0);
+      response = `Total Sales: ₹${total.toLocaleString()}`;
+    } else {
+      const found = products.find(p => lowerText.includes(p.name.toLowerCase().split(' ')[0].toLowerCase()));
+      if (found) response = `${found.name}: ₹${found.price}, Stock: ${found.stock}`;
     }
     return response;
   };
@@ -245,59 +163,36 @@ const AIChatBot = ({ products, transactions, isDark, businessName }) => {
     const userMsg = { role: 'user', text: query };
     setMessages(prev => [...prev, userMsg]);
     setQuery('');
-
     setTimeout(() => {
-      const aiResponse = processQuery(userMsg.text);
-      setMessages(prev => [...prev, { role: 'ai', text: aiResponse }]);
-    }, 600);
+      setMessages(prev => [...prev, { role: 'ai', text: processQuery(userMsg.text) }]);
+    }, 500);
   };
 
   return (
     <>
-      {/* Backdrop for mobile when chat is open to allow click-outside closing */}
-      {isOpen && (
-        <div className="fixed inset-0 bg-transparent z-40 md:hidden" onClick={() => setIsOpen(false)}></div>
-      )}
-
-      <button 
-        onClick={() => setIsOpen(!isOpen)} 
-        className="fixed bottom-6 right-6 z-50 p-4 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full shadow-2xl text-white hover:scale-105 transition-transform active:scale-95"
-      >
+      {isOpen && <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={() => setIsOpen(false)} />}
+      <button onClick={() => setIsOpen(!isOpen)} className="fixed bottom-6 right-6 z-50 p-4 bg-blue-600 rounded-full shadow-lg text-white hover:scale-110 transition-transform active:scale-90">
         {isOpen ? <X size={24} /> : <MessageSquare size={24} />}
       </button>
 
       {isOpen && (
-        <div className={`fixed bottom-24 right-6 z-50 w-[90vw] md:w-96 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-scale-in border max-h-[70vh] ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`} style={{height: '500px'}}>
-          <div className="p-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white flex justify-between items-center shrink-0">
-             <div>
-               <h3 className="font-bold flex items-center gap-2"><div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"/> Business AI</h3>
-               <p className="text-xs opacity-80">Hindi & Voice Enabled</p>
-             </div>
-             <button onClick={() => setIsOpen(false)} className="md:hidden text-white/80"><X size={20}/></button>
+        <div className={`fixed bottom-24 right-4 left-4 md:left-auto md:right-6 z-50 md:w-80 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-scale-in border h-96 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+          <div className="p-3 bg-blue-600 text-white flex justify-between items-center">
+             <h3 className="font-bold text-sm">Assistant</h3>
+             <button onClick={() => setIsOpen(false)}><X size={18}/></button>
           </div>
-          
-          <div className={`flex-1 overflow-y-auto p-4 space-y-3 ${isDark ? 'bg-slate-900' : 'bg-slate-50'}`}>
+          <div className={`flex-1 overflow-y-auto p-3 space-y-2 ${isDark ? 'bg-slate-900' : 'bg-slate-50'}`}>
             {messages.map((msg, idx) => (
               <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[85%] p-3 rounded-2xl text-sm ${msg.role === 'user' ? 'bg-indigo-600 text-white rounded-br-none' : (isDark ? 'bg-slate-700 text-slate-200 rounded-bl-none' : 'bg-white border border-slate-200 text-slate-700 rounded-bl-none')}`}>
-                  {msg.text}
-                </div>
+                <div className={`p-2 px-3 rounded-lg text-xs max-w-[80%] ${msg.role === 'user' ? 'bg-blue-600 text-white' : (isDark ? 'bg-slate-700 text-slate-200' : 'bg-white border text-slate-700')}`}>{msg.text}</div>
               </div>
             ))}
             <div ref={messagesEndRef} />
           </div>
-
-          <div className={`p-3 border-t flex items-center gap-2 shrink-0 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+          <div className={`p-2 border-t flex items-center gap-2 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
             <VoiceInput onResult={setQuery} isDark={isDark} />
-            <input 
-              type="text" 
-              value={query} 
-              onChange={e => setQuery(e.target.value)}
-              onKeyPress={e => e.key === 'Enter' && handleSend()}
-              placeholder="Ask AI..."
-              className={`flex-1 bg-transparent border-none outline-none text-sm ${isDark ? 'text-white placeholder-slate-500' : 'text-slate-800'}`}
-            />
-            <button onClick={handleSend} className="text-indigo-500 hover:text-indigo-600 p-2"><Send size={20}/></button>
+            <input type="text" value={query} onChange={e => setQuery(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleSend()} placeholder="Ask..." className={`flex-1 bg-transparent border-none outline-none text-sm ${isDark ? 'text-white' : 'text-slate-800'}`} />
+            <button onClick={handleSend} className="text-blue-500 p-2"><Send size={18}/></button>
           </div>
         </div>
       )}
@@ -305,114 +200,40 @@ const AIChatBot = ({ products, transactions, isDark, businessName }) => {
   );
 };
 
-const SidebarItem = ({ icon: Icon, label, active, onClick, collapsed }) => (
-  <button
-    onClick={onClick}
-    className={`
-      flex items-center w-full py-3 transition-all duration-200 group
-      ${collapsed ? 'justify-center px-2' : 'px-4 space-x-3'}
-      ${active
-        ? 'bg-blue-600 text-white shadow-md'
-        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-      }
-    `}
-    title={collapsed ? label : ''}
-  >
-    <Icon size={20} className={`shrink-0 ${active ? 'text-white' : 'text-slate-400 group-hover:text-white'}`} />
-    {!collapsed && <span className="text-sm font-medium tracking-wide whitespace-nowrap">{label}</span>}
-    {active && !collapsed && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
-  </button>
-);
-
-const StatCard = ({ title, value, icon: Icon, color, subtext, onClick, clickable, isDark }) => {
-  const colorClasses = {
-    blue: isDark ? 'bg-blue-900/30 text-blue-400 border-blue-800' : 'bg-blue-50 text-blue-600 border-blue-200',
-    red: isDark ? 'bg-red-900/30 text-red-400 border-red-800' : 'bg-red-50 text-red-600 border-red-200',
-    green: isDark ? 'bg-emerald-900/30 text-emerald-400 border-emerald-800' : 'bg-emerald-50 text-emerald-600 border-emerald-200',
-  };
-
-  return (
-    <div
-      onClick={onClick}
-      className={`p-5 rounded-lg border shadow-sm flex items-start justify-between relative overflow-hidden group transition-all
-        ${isDark ? 'bg-slate-800 border-slate-700 hover:border-blue-500' : 'bg-white border-slate-200 hover:border-blue-400'}
-        ${clickable ? 'cursor-pointer hover:shadow-md active:scale-98' : ''}`}
-    >
-      <div className="z-10">
-        <p className={`text-xs font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{title}</p>
-        <h3 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{value}</h3>
-        {subtext && <p className={`text-xs mt-2 font-medium ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{subtext}</p>}
-      </div>
-      <div className={`p-3 rounded-md ${colorClasses[color]} z-10 border`}>
-        <Icon size={22} />
-      </div>
-      <Icon className={`absolute -bottom-4 -right-4 w-24 h-24 opacity-5 transform group-hover:scale-110 transition-transform ${isDark ? 'text-white' : 'text-slate-900'}`} />
-    </div>
-  );
-};
-
 const ProductDetailModal = ({ product, onClose, onStockChange, isDark }) => {
   if (!product) return null;
   return (
-    // Backdrop with click-to-close
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm animate-fade-in p-4" onClick={onClose}>
-      <div 
-        className={`rounded-lg shadow-2xl w-full max-w-lg overflow-hidden border animate-scale-in flex flex-col max-h-[90vh] ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}
-        onClick={(e) => e.stopPropagation()} // Prevent close when clicking inside modal
-      >
-        <div className={`px-6 py-4 border-b flex justify-between items-center ${isDark ? 'bg-slate-900/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+    <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in" onClick={onClose}>
+      <div className={`rounded-t-2xl md:rounded-lg shadow-2xl w-full max-w-lg overflow-hidden animate-slide-up md:animate-scale-in flex flex-col max-h-[85vh] ${isDark ? 'bg-slate-900' : 'bg-white'}`} onClick={e => e.stopPropagation()}>
+        <div className={`px-6 py-4 border-b flex justify-between items-center ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
           <div>
             <h3 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{product.name}</h3>
-            <span className={`text-xs font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>ID: #{product.id}</span>
+            <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>In Stock: {product.stock}</span>
           </div>
-          <button onClick={onClose} className={`p-1 rounded-full transition-colors ${isDark ? 'text-slate-400 hover:bg-slate-700 hover:text-white' : 'text-slate-400 hover:bg-slate-200 hover:text-slate-700'}`}>
-            <X size={20} />
-          </button>
+          <button onClick={onClose} className={`p-2 rounded-full ${isDark ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-800'}`}><X size={20} /></button>
         </div>
-
         <div className="p-6 overflow-y-auto space-y-6">
           <div className="grid grid-cols-2 gap-4">
-             <div className={`p-4 rounded-md border ${isDark ? 'bg-blue-900/20 border-blue-900/50' : 'bg-blue-50/50 border-blue-100'}`}>
-                <p className="text-blue-500 text-xs font-bold uppercase">Unit Price</p>
-                <p className={`text-xl font-bold ${isDark ? 'text-blue-100' : 'text-slate-800'}`}>₹{product.price.toLocaleString()}</p>
+             <div className={`p-4 rounded-xl border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-blue-50 border-blue-100'}`}>
+                <p className="text-xs font-bold text-blue-500 uppercase">Price</p>
+                <p className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>₹{product.price}</p>
              </div>
-             <div className={`p-4 rounded-md border ${isDark ? 'bg-slate-700/50 border-slate-600' : 'bg-slate-50 border-slate-100'}`}>
-                <p className={`text-xs font-bold uppercase ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Current Stock</p>
-                <div className="flex items-center gap-2">
-                  <p className={`text-xl font-bold ${product.stock < 5 ? 'text-red-500' : 'text-emerald-500'}`}>
-                    {product.stock}
-                  </p>
-                  <span className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>units</span>
-                </div>
-             </div>
-          </div>
-
-          <div>
-            <p className={`text-xs font-bold uppercase mb-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Compatibility Map</p>
-            <div className="flex flex-wrap gap-2">
-              {product.compatibleCars.map((car, idx) => (
-                <span key={idx} className={`px-2 py-1 text-xs font-medium rounded border shadow-sm capitalize flex items-center gap-1 ${isDark ? 'bg-slate-700 border-slate-600 text-slate-200' : 'bg-white border-slate-200 text-slate-700'}`}>
-                  <Car size={10} className={isDark ? 'text-slate-400' : 'text-slate-400'}/> {car}
+             <div className={`p-4 rounded-xl border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                <p className={`text-xs font-bold uppercase ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Status</p>
+                <span className={`inline-block mt-1 px-2 py-1 rounded text-xs font-bold ${product.stock < 5 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                  {product.stock < 5 ? 'Low Stock' : 'Good'}
                 </span>
-              ))}
-            </div>
+             </div>
           </div>
-
-          <div className={`p-4 rounded-md border ${isDark ? 'bg-slate-700/30 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-            <p className={`text-center text-xs font-bold uppercase mb-3 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Inventory Adjustment</p>
-            <div className="flex items-center justify-center space-x-6">
-               <button
-                 onClick={() => onStockChange(product.id, -1)}
-                 className={`w-10 h-10 rounded-md border flex items-center justify-center transition-all shadow-sm active:scale-95 ${isDark ? 'bg-slate-800 border-slate-600 text-red-400 hover:bg-slate-700' : 'bg-white border-slate-300 text-red-500 hover:bg-red-50'}`}
-               >
-                 <Minus size={20}/>
+          <div className={`p-4 rounded-xl border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+            <p className={`text-center text-xs font-bold uppercase mb-4 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Quick Actions</p>
+            <div className="flex items-center justify-between gap-4">
+               <button onClick={() => onStockChange(product.id, -1)} className="flex-1 py-3 rounded-lg bg-red-100 text-red-700 font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform">
+                 <Minus size={20}/> Sell
                </button>
-               <span className={`font-mono text-2xl font-bold w-16 text-center ${isDark ? 'text-white' : 'text-slate-800'}`}>{product.stock}</span>
-               <button
-                 onClick={() => onStockChange(product.id, 1)}
-                 className={`w-10 h-10 rounded-md border flex items-center justify-center transition-all shadow-md active:scale-95 ${isDark ? 'bg-blue-600 border-blue-600 text-white hover:bg-blue-500' : 'bg-slate-800 border-slate-800 text-white hover:bg-slate-700'}`}
-               >
-                 <Plus size={20}/>
+               <div className={`text-2xl font-bold font-mono ${isDark ? 'text-white' : 'text-slate-900'}`}>{product.stock}</div>
+               <button onClick={() => onStockChange(product.id, 1)} className="flex-1 py-3 rounded-lg bg-green-100 text-green-700 font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform">
+                 <Plus size={20}/> Add
                </button>
             </div>
           </div>
@@ -425,21 +246,20 @@ const ProductDetailModal = ({ product, onClose, onStockChange, isDark }) => {
 export default function ERPSystem() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   
-  // -- STATE INITIALIZATION WITH PERSISTENCE --
+  // -- STATE --
   const [activeTab, setActiveTab] = useState('dashboard');
   const [theme, setTheme] = useState(() => loadFromStorage('theme', 'light'));
   const [products, setProducts] = useState(() => loadFromStorage('products', initialProducts));
   const [categories, setCategories] = useState(() => loadFromStorage('categories', initialCategories));
   const [transactions, setTransactions] = useState(() => loadFromStorage('transactions', initialTransactions));
-  const [notes, setNotes] = useState(() => loadFromStorage('notes', "• Order new mats for Swift\n• Call distributor regarding delayed shipment."));
-  const [businessName, setBusinessName] = useState(() => loadFromStorage('businessName', 'AutoHub Enterprise'));
+  const [notes, setNotes] = useState(() => loadFromStorage('notes', "• Call distributor."));
+  const [businessName, setBusinessName] = useState(() => loadFromStorage('businessName', 'AutoHub'));
   const [lowStockThreshold, setLowStockThreshold] = useState(() => loadFromStorage('threshold', 5));
   const [currency, setCurrency] = useState('₹');
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [dashboardView, setDashboardView] = useState('overview');
   const [selectedProductForDetail, setSelectedProductForDetail] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All Items');
@@ -450,36 +270,18 @@ export default function ERPSystem() {
   const [carModelSearch, setCarModelSearch] = useState('');
   const [selectedCarCategory, setSelectedCarCategory] = useState(null);
 
-  // Check login on mount
   useEffect(() => {
-    const authStatus = localStorage.getItem('isAuthenticated');
-    if (authStatus === 'true') {
-      setIsAuthenticated(true);
-    }
+    if (localStorage.getItem('isAuthenticated') === 'true') setIsAuthenticated(true);
   }, []);
 
-  const handleLogin = () => {
-    setIsAuthenticated(true);
-    localStorage.setItem('isAuthenticated', 'true');
-  };
+  const handleLogin = () => { setIsAuthenticated(true); localStorage.setItem('isAuthenticated', 'true'); };
+  const handleLogout = () => { setIsAuthenticated(false); localStorage.removeItem('isAuthenticated'); };
 
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    localStorage.removeItem('isAuthenticated');
-  };
-
-  // Persist Data on Change
+  // Persist
   useEffect(() => localStorage.setItem('products', JSON.stringify(products)), [products]);
-  useEffect(() => localStorage.setItem('categories', JSON.stringify(categories)), [categories]);
   useEffect(() => localStorage.setItem('transactions', JSON.stringify(transactions)), [transactions]);
-  useEffect(() => localStorage.setItem('notes', JSON.stringify(notes)), [notes]);
-  useEffect(() => localStorage.setItem('theme', JSON.stringify(theme)), [theme]);
-  useEffect(() => localStorage.setItem('businessName', JSON.stringify(businessName)), [businessName]);
-  useEffect(() => localStorage.setItem('threshold', JSON.stringify(lowStockThreshold)), [lowStockThreshold]);
 
-  // Derived state for theme
   const isDark = theme === 'dark';
-
   const lowStockItems = useMemo(() => products.filter(p => p.stock < lowStockThreshold), [products, lowStockThreshold]);
   const totalValue = useMemo(() => products.reduce((acc, curr) => acc + (curr.price * curr.stock), 0), [products]);
 
@@ -510,48 +312,13 @@ export default function ERPSystem() {
     setProducts(currentProducts => {
       const product = currentProducts.find(p => p.id === id);
       if (!product) return currentProducts;
-
       if (amount !== 0) {
         const type = amount > 0 ? 'Restock' : 'Sale';
-        const newTransaction = {
-          id: Date.now(),
-          type,
-          productName: product.name,
-          amount: amount > 0 ? 0 : product.price,
-          date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        };
+        const newTransaction = { id: Date.now(), type, productName: product.name, amount: amount > 0 ? 0 : product.price, date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
         setTransactions(prev => [newTransaction, ...prev]);
       }
-
-      return currentProducts.map(p => {
-        if (p.id === id) {
-          const newStock = Math.max(0, p.stock + amount);
-          return { ...p, stock: newStock };
-        }
-        return p;
-      });
+      return currentProducts.map(p => p.id === id ? { ...p, stock: Math.max(0, p.stock + amount) } : p);
     });
-  };
-
-  const handleAddCategory = (e) => {
-    e.preventDefault();
-    if (newCategoryName && !categories.includes(newCategoryName)) {
-      setCategories([...categories, newCategoryName]);
-      setNewCategoryName('');
-      setIsCategoryModalOpen(false);
-    }
-  };
-
-  const handleDeleteCategory = (catName, e) => {
-    e.stopPropagation();
-    if (catName === 'All Items') return;
-    if (window.confirm(`Delete category "${catName}"?`)) {
-      if (window.confirm(`WARNING: This will delete all items in "${catName}". Continue?`)) {
-          setCategories(categories.filter(c => c !== catName));
-          if (selectedCategory === catName) setSelectedCategory('All Items');
-          setProducts(products.filter(p => p.category !== catName));
-      }
-    }
   };
 
   const handleAddProduct = (e) => {
@@ -559,694 +326,294 @@ export default function ERPSystem() {
     if (!newProduct.name || !newProduct.price) return;
     const carsArray = newProduct.compatibleCars.split(',').map(car => car.trim().toLowerCase()).filter(i => i);
     if (carsArray.length === 0) carsArray.push('universal');
-
-    const newItem = {
-      id: Date.now(),
-      name: newProduct.name,
-      category: newProduct.category || 'General',
-      price: parseFloat(newProduct.price),
-      stock: parseInt(newProduct.stock) || 0,
-      compatibleCars: carsArray
-    };
+    const newItem = { id: Date.now(), name: newProduct.name, category: newProduct.category || 'General', price: parseFloat(newProduct.price), stock: parseInt(newProduct.stock) || 0, compatibleCars: carsArray };
     setProducts([...products, newItem]);
     setNewProduct({ name: '', category: '', price: '', stock: '', compatibleCars: '' });
     setIsAddModalOpen(false);
   };
 
   // --- RENDER FUNCTIONS ---
-
-  const renderDashboard = () => {
-    if (dashboardView === 'transactions') {
-      return (
-        <div className="animate-fade-in flex flex-col h-full">
-           <div className="flex items-center justify-between mb-4 shrink-0">
-             <button onClick={() => setDashboardView('overview')} className="flex items-center text-slate-500 hover:text-blue-600 transition-colors font-medium">
-               <ArrowLeft size={18} className="mr-2"/> Back to Dashboard
-             </button>
-             <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>Transaction History</h2>
+  const renderDashboard = () => (
+    <div className="space-y-6 animate-fade-in pb-20">
+      <div className="grid grid-cols-1 gap-4">
+        {/* Mobile Friendly Stats */}
+        <div className={`p-5 rounded-xl border shadow-sm flex items-center justify-between ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`} onClick={() => setActiveTab('inventory')}>
+           <div>
+              <p className="text-xs font-bold text-slate-500 uppercase">Inventory</p>
+              <h3 className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{products.length}</h3>
            </div>
+           <div className="bg-blue-100 p-3 rounded-lg text-blue-600"><Package size={24}/></div>
+        </div>
 
-           <div className={`rounded-lg shadow-sm border flex-1 overflow-hidden flex flex-col ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-             <div className="overflow-x-auto flex-1">
-               <table className="w-full text-left text-sm min-w-[500px]">
-                 <thead className={`font-semibold sticky top-0 z-10 border-b ${isDark ? 'bg-slate-900 text-slate-400 border-slate-700' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
-                   <tr>
-                     <th className="px-6 py-3">Time</th>
-                     <th className="px-6 py-3">Type</th>
-                     <th className="px-6 py-3">Product</th>
-                     <th className="px-6 py-3 text-right">Value</th>
-                   </tr>
-                 </thead>
-                 <tbody className={`divide-y ${isDark ? 'divide-slate-700' : 'divide-slate-100'}`}>
-                   {transactions.map(t => (
-                     <tr key={t.id} className={`${isDark ? 'hover:bg-slate-700/50' : 'hover:bg-slate-50'}`}>
-                       <td className={`px-6 py-3 font-mono text-xs ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>{t.date}</td>
-                       <td className="px-6 py-3">
-                         <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wide border ${t.type === 'Sale' ? (isDark ? 'bg-emerald-900/30 text-emerald-400 border-emerald-800' : 'bg-emerald-50 text-emerald-700 border-emerald-100') : (isDark ? 'bg-blue-900/30 text-blue-400 border-blue-800' : 'bg-blue-50 text-blue-700 border-blue-100')}`}>
-                           {t.type}
-                         </span>
-                       </td>
-                       <td className={`px-6 py-3 font-medium ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{t.productName}</td>
-                       <td className={`px-6 py-3 text-right font-mono ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{t.amount > 0 ? `+₹${t.amount}` : '-'}</td>
-                     </tr>
-                   ))}
-                 </tbody>
-               </table>
+        <div className={`p-5 rounded-xl border shadow-sm flex items-center justify-between ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+           <div>
+              <p className="text-xs font-bold text-slate-500 uppercase">Valuation</p>
+              <h3 className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>₹{totalValue.toLocaleString()}</h3>
+           </div>
+           <div className="bg-green-100 p-3 rounded-lg text-green-600"><TrendingUp size={24}/></div>
+        </div>
+
+        {lowStockItems.length > 0 && (
+           <div className={`p-5 rounded-xl border shadow-sm flex items-center justify-between border-red-200 ${isDark ? 'bg-red-900/20' : 'bg-red-50'}`} onClick={() => setShowNotifications(true)}>
+             <div>
+                <p className="text-xs font-bold text-red-500 uppercase">Low Stock</p>
+                <h3 className={`text-3xl font-bold text-red-600`}>{lowStockItems.length}</h3>
              </div>
-           </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="space-y-6 animate-fade-in pb-10">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
-          <StatCard
-            isDark={isDark}
-            title="Total Inventory"
-            value={products.length}
-            icon={Package}
-            color="blue"
-            subtext="Unique SKUs"
-            clickable
-            onClick={() => setActiveTab('inventory')}
-          />
-          <StatCard
-            isDark={isDark}
-            title="Critical Stock"
-            value={lowStockItems.length}
-            icon={AlertTriangle}
-            color="red"
-            subtext={lowStockItems.length > 0 ? "Items need attention" : "Stock healthy"}
-            clickable
-            onClick={() => setShowNotifications(true)}
-          />
-          <StatCard
-            isDark={isDark}
-            title="Total Valuation"
-            value={`₹${totalValue.toLocaleString()}`}
-            icon={TrendingUp}
-            color="green"
-            subtext="Current Asset Value"
-            clickable
-            onClick={() => setDashboardView('transactions')}
-          />
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:h-[400px]">
-          <div className={`rounded-lg shadow-sm border flex flex-col overflow-hidden h-[300px] md:h-full ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-            <div className={`p-3 border-b flex items-center justify-between ${isDark ? 'border-slate-700 bg-slate-900/30' : 'border-slate-200 bg-slate-50'}`}>
-              <h3 className={`font-bold text-sm uppercase tracking-wide flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                <FileText size={16} /> System Notes
-              </h3>
-              <span className={`text-[10px] px-2 py-0.5 rounded ${isDark ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-600'}`}>Autosave ON</span>
-            </div>
-            <textarea
-              className={`flex-1 w-full p-4 resize-none outline-none font-mono text-sm leading-relaxed ${isDark ? 'bg-slate-800 text-slate-300 placeholder-slate-600' : 'bg-white text-slate-700'}`}
-              placeholder="Enter system notes..."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
+             <div className="bg-red-200 p-3 rounded-lg text-red-600"><AlertTriangle size={24}/></div>
           </div>
+        )}
+      </div>
 
-          <div className={`rounded-lg shadow-sm border flex flex-col overflow-hidden h-[300px] md:h-full ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-            <div className={`p-3 border-b flex justify-between items-center ${isDark ? 'border-slate-700 bg-slate-900/30' : 'border-slate-200 bg-slate-50'}`}>
-              <h3 className={`font-bold text-sm uppercase tracking-wide ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Live Feed</h3>
-              <button onClick={() => setDashboardView('transactions')} className="text-xs text-blue-600 hover:underline font-medium">Full History</button>
-            </div>
-            <div className="overflow-y-auto flex-1">
-              {transactions.slice(0, 10).map(t => (
-                <div key={t.id} className={`flex items-center justify-between p-3 border-b transition-colors ${isDark ? 'border-slate-700 hover:bg-slate-700/50' : 'border-slate-50 hover:bg-slate-50'}`}>
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded flex items-center justify-center shrink-0 ${t.type === 'Sale' ? (isDark ? 'bg-emerald-900/30 text-emerald-400' : 'bg-emerald-100 text-emerald-600') : (isDark ? 'bg-blue-900/30 text-blue-400' : 'bg-blue-100 text-blue-600')}`}>
-                      {t.type === 'Sale' ? <DollarSign size={14}/> : <Plus size={14}/>}
-                    </div>
-                    <div>
-                      <p className={`text-sm font-semibold truncate max-w-[120px] sm:max-w-[150px] ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{t.productName}</p>
-                      <p className="text-[10px] text-slate-400 font-mono">{t.date}</p>
-                    </div>
-                  </div>
-                  {t.type === 'Sale' && <span className="font-bold text-emerald-500 text-sm font-mono">+₹{t.amount}</span>}
+      <div className={`rounded-xl border shadow-sm overflow-hidden ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+        <div className={`p-4 border-b font-bold ${isDark ? 'border-slate-700' : 'border-slate-100'}`}>Recent Sales</div>
+        <div className="divide-y divide-slate-100 dark:divide-slate-700">
+           {transactions.slice(0, 5).map(t => (
+             <div key={t.id} className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                   <div className={`w-10 h-10 rounded-full flex items-center justify-center ${t.type === 'Sale' ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'}`}>
+                      {t.type === 'Sale' ? <DollarSign size={16}/> : <Plus size={16}/>}
+                   </div>
+                   <div>
+                      <p className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>{t.productName}</p>
+                      <p className="text-xs text-slate-500">{t.date}</p>
+                   </div>
                 </div>
-              ))}
-              {transactions.length === 0 && <div className="text-center text-slate-400 mt-10 text-sm">No activity recorded.</div>}
-            </div>
-          </div>
+                {t.type === 'Sale' && <span className="font-bold text-green-600">+₹{t.amount}</span>}
+             </div>
+           ))}
         </div>
       </div>
-    );
-  };
+    </div>
+  );
 
   const renderInventory = () => (
-    <div className="flex flex-col h-full animate-fade-in overflow-hidden">
-      <div className={`p-4 border-b flex flex-col md:flex-row justify-between items-center gap-4 shrink-0 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-        <div className="relative w-full md:w-96 flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={16} />
-            <input
-              type="text"
-              placeholder="Search SKU, Name..."
-              className={`w-full pl-9 pr-4 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${isDark ? 'bg-slate-900 border-slate-600 text-white placeholder-slate-500' : 'bg-white border-slate-300'}`}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <VoiceInput onResult={setSearchTerm} isDark={isDark} />
+    <div className="flex flex-col h-full animate-fade-in pb-20">
+      {/* Mobile Sticky Header */}
+      <div className={`sticky top-0 z-20 p-4 border-b space-y-3 shadow-sm ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+        <div className="flex gap-2">
+           <div className={`flex-1 flex items-center px-3 py-2 border rounded-lg ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-100 border-slate-200'}`}>
+              <Search size={18} className="text-slate-400 mr-2"/>
+              <input type="text" className="bg-transparent w-full outline-none text-sm" placeholder="Search..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)}/>
+           </div>
+           <VoiceInput onResult={setSearchTerm} isDark={isDark} />
         </div>
-        <div className="flex gap-2 w-full md:w-auto">
-          <button onClick={() => setIsCategoryModalOpen(true)} className={`flex-1 md:flex-none px-4 py-2 border rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 ${isDark ? 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700' : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'}`}>
-            <FolderPlus size={16} /> <span className="hidden sm:inline">New Category</span>
-          </button>
-          <button onClick={() => setIsAddModalOpen(true)} className={`flex-1 md:flex-none px-4 py-2 text-white rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 shadow-sm ${isDark ? 'bg-blue-600 hover:bg-blue-500' : 'bg-slate-900 hover:bg-slate-800'}`}>
-            <Plus size={16} /> <span className="hidden sm:inline">Add Product</span>
-          </button>
+        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+           {categories.map(cat => (
+             <button key={cat} onClick={() => setSelectedCategory(cat)} className={`whitespace-nowrap px-4 py-2 rounded-full text-xs font-bold transition-colors ${selectedCategory === cat ? 'bg-blue-600 text-white' : (isDark ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-600')}`}>
+               {cat}
+             </button>
+           ))}
         </div>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
-        <div className={`hidden md:flex flex-col border-r transition-all duration-300 ${isSidebarCollapsed ? 'w-0 overflow-hidden' : 'w-56'} ${isDark ? 'bg-slate-900/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-           <div className="p-3">
-             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Filters</h3>
-             <div className="space-y-1">
-               {categories.map(cat => (
-                 <div key={cat} className="group flex items-center">
-                   <button
-                     onClick={() => setSelectedCategory(cat)}
-                     className={`flex-1 text-left px-3 py-2 rounded-md text-xs font-semibold flex items-center justify-between transition-colors ${
-                       selectedCategory === cat
-                         ? (isDark ? 'bg-slate-800 text-blue-400 shadow-sm border border-slate-700' : 'bg-white text-blue-700 shadow-sm border border-slate-200')
-                         : (isDark ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-600 hover:bg-white hover:shadow-sm')
-                     }`}
-                   >
-                     <span>{cat}</span>
-                     {selectedCategory === cat && <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>}
-                   </button>
-                   {cat !== 'All Items' && (
-                     <button
-                       onClick={(e) => handleDeleteCategory(cat, e)}
-                       className="text-slate-300 hover:text-red-500 p-1.5 opacity-0 group-hover:opacity-100 transition-all"
-                       title="Delete Category"
-                     >
-                       <Trash2 size={12}/>
-                     </button>
-                   )}
+      <div className="p-4 space-y-4 overflow-y-auto">
+         {/* MOBILE CARD VIEW (No Table) */}
+         {filteredProducts.map(p => (
+           <div key={p.id} className={`p-4 rounded-xl border shadow-sm relative flex flex-col gap-3 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+              <div className="flex justify-between items-start">
+                 <div>
+                    <h3 className={`font-bold text-lg leading-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>{p.name}</h3>
+                    <p className="text-xs text-slate-500 mt-1">{p.category}</p>
                  </div>
-               ))}
+                 <div className={`px-2 py-1 rounded text-xs font-bold ${p.stock < 5 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
+                    {p.stock} Left
+                 </div>
+              </div>
+              
+              <div className="flex justify-between items-end mt-2">
+                 <p className={`text-2xl font-bold ${isDark ? 'text-blue-300' : 'text-blue-700'}`}>₹{p.price}</p>
+              </div>
+
+              {/* BIG ACTION BUTTONS FOR MOBILE */}
+              <div className="grid grid-cols-3 gap-3 mt-2">
+                 <button onClick={() => handleStockChange(p.id, -1)} className={`py-3 rounded-lg flex items-center justify-center ${isDark ? 'bg-slate-700 text-red-400' : 'bg-red-50 text-red-600 border border-red-100'}`}>
+                    <Minus size={20} />
+                 </button>
+                 <button onClick={() => setSelectedProductForDetail(p)} className={`py-3 rounded-lg flex items-center justify-center font-bold text-sm ${isDark ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-700 border border-slate-200'}`}>
+                    VIEW
+                 </button>
+                 <button onClick={() => handleStockChange(p.id, 1)} className={`py-3 rounded-lg flex items-center justify-center ${isDark ? 'bg-slate-700 text-green-400' : 'bg-green-50 text-green-600 border border-green-100'}`}>
+                    <Plus size={20} />
+                 </button>
+              </div>
+           </div>
+         ))}
+         
+         {/* Add Button Floating */}
+         <button onClick={() => setIsAddModalOpen(true)} className="fixed bottom-24 right-6 w-14 h-14 bg-blue-600 rounded-full shadow-xl text-white flex items-center justify-center z-30 md:hidden active:scale-90 transition-transform">
+            <Plus size={30} />
+         </button>
+      </div>
+    </div>
+  );
+
+  const renderCarSearch = () => (
+    <div className="p-4 flex flex-col h-full animate-fade-in">
+       <div className="flex-1 flex flex-col items-center pt-10">
+          <div className={`p-4 rounded-full mb-6 ${isDark ? 'bg-slate-800' : 'bg-blue-50'}`}>
+             <Car size={40} className="text-blue-600"/>
+          </div>
+          <h2 className={`text-2xl font-bold mb-6 ${isDark ? 'text-white' : 'text-slate-900'}`}>Car Finder</h2>
+          
+          <div className="w-full max-w-md relative">
+             <input type="text" placeholder="Enter Car Model (e.g. Swift)" className={`w-full py-4 pl-6 pr-12 rounded-xl border text-lg shadow-sm outline-none focus:ring-2 focus:ring-blue-500 ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300'}`} value={carModelSearch} onChange={e => {setCarModelSearch(e.target.value); setSelectedCarCategory(null);}} />
+             <div className="absolute right-2 top-2">
+                <VoiceInput onResult={setCarModelSearch} isDark={isDark} />
              </div>
+          </div>
+
+          {carModelSearch.length > 2 && (
+             <div className="w-full max-w-md mt-6 space-y-3">
+                {Object.keys(carMatchCategories).map(cat => (
+                   <div key={cat} onClick={() => setSelectedCarCategory(cat)} className={`p-4 rounded-xl border flex justify-between items-center active:scale-95 transition-transform ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+                      <span className={`font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{cat}</span>
+                      <span className="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded-full">{carMatchCategories[cat].length} Parts</span>
+                   </div>
+                ))}
+             </div>
+          )}
+
+          {selectedCarCategory && (
+             <div className="fixed inset-0 z-50 bg-white dark:bg-slate-900 overflow-y-auto animate-slide-up">
+                <div className="p-4 border-b sticky top-0 bg-inherit z-10 flex items-center gap-3">
+                   <button onClick={() => setSelectedCarCategory(null)}><ArrowLeft size={24} className={isDark ? 'text-white' : 'text-black'}/></button>
+                   <h3 className={`font-bold text-lg ${isDark ? 'text-white' : 'text-black'}`}>{selectedCarCategory} for {carModelSearch}</h3>
+                </div>
+                <div className="p-4 space-y-4">
+                   {carMatchCategories[selectedCarCategory].map(p => (
+                      <div key={p.id} className={`p-4 rounded-xl border shadow-sm ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`} onClick={() => setSelectedProductForDetail(p)}>
+                         <h4 className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{p.name}</h4>
+                         <div className="flex justify-between items-center mt-3">
+                            <span className={`text-xl font-bold ${isDark ? 'text-blue-300' : 'text-blue-600'}`}>₹{p.price}</span>
+                            <span className="text-xs text-slate-400">Tap to view</span>
+                         </div>
+                      </div>
+                   ))}
+                </div>
+             </div>
+          )}
+       </div>
+    </div>
+  );
+
+  const renderSettings = () => (
+     <div className="p-4 space-y-6 animate-fade-in">
+        <h2 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>Settings</h2>
+        
+        <div className={`p-4 rounded-xl border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+           <h3 className={`font-bold mb-4 ${isDark ? 'text-white' : 'text-slate-900'}`}>Appearance</h3>
+           <div className="flex gap-4">
+              <button onClick={() => setTheme('light')} className={`flex-1 py-3 rounded-lg border font-bold flex items-center justify-center gap-2 ${!isDark ? 'bg-blue-50 border-blue-500 text-blue-600' : 'border-slate-600 text-slate-400'}`}><Sun size={20}/> Light</button>
+              <button onClick={() => setTheme('dark')} className={`flex-1 py-3 rounded-lg border font-bold flex items-center justify-center gap-2 ${isDark ? 'bg-slate-700 border-blue-500 text-blue-400' : 'border-slate-200 text-slate-400'}`}><Moon size={20}/> Dark</button>
            </div>
         </div>
 
-        <div className={`md:hidden w-full p-2 border-b shrink-0 ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-          <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className={`w-full p-2 border rounded text-sm ${isDark ? 'bg-slate-800 border-slate-600 text-white' : 'bg-white border-slate-300'}`}>
-            {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-          </select>
-        </div>
-
-        <div className={`flex-1 overflow-hidden flex flex-col ${isDark ? 'bg-slate-800' : 'bg-white'}`}>
-          <div className={`px-4 py-2 border-b flex justify-between items-center shrink-0 ${isDark ? 'border-slate-700 bg-slate-800' : 'border-slate-100 bg-white'}`}>
-            <h3 className={`font-bold text-sm flex items-center gap-2 ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
-              <Folder size={16} className="text-blue-500"/>
-              {selectedCategory}
-            </h3>
-            <span className="text-xs text-slate-400 font-mono">{filteredProducts.length} records</span>
-          </div>
-
-          <div className="overflow-x-auto flex-1">
-            <table className="w-full text-left border-collapse min-w-[600px] md:min-w-0">
-              <thead className={`text-[11px] uppercase font-bold tracking-wider sticky top-0 z-10 border-b shadow-sm ${isDark ? 'bg-slate-900 text-slate-400 border-slate-700' : 'bg-slate-50 text-slate-600 border-slate-200'}`}>
-                <tr>
-                  <th className="px-4 py-3">Product Name</th>
-                  <th className="px-4 py-3 text-right">Price</th>
-                  <th className="px-4 py-3 text-center">Status</th>
-                  <th className="px-4 py-3 text-center">Stock Control</th>
-                </tr>
-              </thead>
-              <tbody className={`divide-y text-sm ${isDark ? 'divide-slate-700' : 'divide-slate-100'}`}>
-                {filteredProducts.map((product) => (
-                  <tr key={product.id} className={`transition-colors group ${isDark ? 'hover:bg-slate-700/50' : 'hover:bg-blue-50/30'}`}>
-                    <td className="px-4 py-2.5">
-                      <div className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{product.name}</div>
-                    </td>
-                    <td className="px-4 py-2.5 text-right font-mono text-slate-500">₹{product.price.toLocaleString()}</td>
-                    <td className="px-4 py-2.5 text-center">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${
-                        product.stock < lowStockThreshold
-                          ? (isDark ? 'bg-red-900/30 text-red-400 border-red-800' : 'bg-red-50 text-red-700 border-red-100')
-                          : (isDark ? 'bg-emerald-900/30 text-emerald-400 border-emerald-800' : 'bg-emerald-50 text-emerald-700 border-emerald-100')
-                      }`}>
-                        {product.stock} Units
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <div className="flex items-center justify-center space-x-1 opacity-80 group-hover:opacity-100 transition-opacity">
-                        <button
-                           onClick={() => handleStockChange(product.id, -1)}
-                           className={`w-7 h-7 flex items-center justify-center rounded border transition-colors ${isDark ? 'bg-slate-800 border-slate-600 text-red-400 hover:bg-slate-700' : 'bg-white border-slate-200 text-red-600 hover:bg-red-50 hover:border-red-200'}`}
-                           title="Sell/Reduce"
-                        >
-                           <Minus size={12}/>
-                        </button>
-                        <button
-                          onClick={() => setSelectedProductForDetail(product)}
-                          className={`px-2 h-7 text-xs rounded border font-medium transition-colors ${isDark ? 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-blue-900/30 hover:text-blue-400 hover:border-blue-800' : 'bg-slate-100 hover:bg-blue-50 hover:text-blue-600 text-slate-600 border-slate-200'}`}
-                        >
-                          View
-                        </button>
-                        <button
-                           onClick={() => handleStockChange(product.id, 1)}
-                           className={`w-7 h-7 flex items-center justify-center rounded border transition-colors ${isDark ? 'bg-slate-800 border-slate-600 text-emerald-400 hover:bg-slate-700' : 'bg-white border-slate-200 text-emerald-600 hover:bg-emerald-50 hover:border-emerald-200'}`}
-                           title="Restock/Add"
-                        >
-                           <Plus size={12}/>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {filteredProducts.length === 0 && (
-              <div className="flex flex-col items-center justify-center h-48 text-slate-400">
-                <Search size={48} className="mb-2 opacity-20"/>
-                <p>No products found in this category.</p>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
+        <button onClick={() => {
+           const blob = new Blob([JSON.stringify({products, transactions}, null, 2)], {type: 'application/json'});
+           const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'backup.json'; a.click();
+        }} className="w-full py-4 rounded-xl bg-blue-600 text-white font-bold flex items-center justify-center gap-2 shadow-lg active:scale-95">
+           <FileText size={20}/> Download Backup
+        </button>
+     </div>
   );
 
-  const renderCarSearch = () => {
-    if (selectedCarCategory) {
-      const categoryProducts = carMatchCategories[selectedCarCategory] || [];
-      return (
-        <div className="max-w-5xl mx-auto animate-fade-in p-6 h-full overflow-y-auto">
-          <button
-            onClick={() => setSelectedCarCategory(null)}
-            className="mb-6 flex items-center text-slate-500 hover:text-blue-600 transition-colors font-medium"
-          >
-            <ArrowLeft size={20} className="mr-2"/> Back to Categories
-          </button>
-
-          <div className={`rounded-lg shadow-sm border overflow-hidden ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-            <div className="bg-slate-900 px-6 py-4 text-white flex items-center justify-between">
-              <h2 className="text-xl font-bold flex items-center">
-                <Folder className="mr-3 text-blue-400" size={20} />
-                {selectedCarCategory} <span className="text-slate-400 mx-2">/</span> {carModelSearch}
-              </h2>
-            </div>
-            <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {categoryProducts.map(product => (
-                  <div key={product.id} 
-                       onClick={() => setSelectedProductForDetail(product)}
-                       className={`border p-4 rounded-lg hover:shadow-md transition-all cursor-pointer group relative ${isDark ? 'bg-slate-800 border-slate-700 hover:border-blue-500' : 'bg-white border-slate-200 hover:border-blue-300'}`}
-                  >
-                     <div className="flex justify-between items-start mb-2">
-                       <h4 className={`font-bold line-clamp-2 text-sm group-hover:text-blue-600 ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{product.name}</h4>
-                       <div className={`w-2 h-2 rounded-full shrink-0 mt-1.5 ${product.stock > 0 ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
-                     </div>
-                     <div className="flex justify-between items-end mt-4">
-                       <p className={`text-lg font-bold font-mono ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>₹{product.price}</p>
-                       <span className="text-[10px] text-blue-500 font-medium opacity-0 group-hover:opacity-100 transition-opacity">VIEW DETAILS</span>
-                     </div>
-                  </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )
-    }
-
-    return (
-      <div className="flex items-center justify-center h-full p-6 animate-fade-in overflow-y-auto">
-        <div className="w-full max-w-2xl text-center space-y-8">
-          <div className={`inline-block p-6 rounded-full mb-4 border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-blue-50 border-blue-100'}`}>
-            <Car className={`w-12 h-12 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
-          </div>
-          <h2 className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>ERP Smart Car Finder</h2>
-          <p className="text-slate-500 max-w-md mx-auto">Enter a vehicle model to instantly filter the entire database for compatible parts.</p>
-
-          <div className="relative max-w-lg mx-auto group">
-              <div className="flex gap-2">
-                  <div className="relative flex-1">
-                      <input
-                        type="text"
-                        className={`block w-full pl-6 pr-14 py-4 border rounded-lg text-lg shadow-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all ${isDark ? 'bg-slate-800 border-slate-600 text-white placeholder-slate-500' : 'bg-white border-slate-300'}`}
-                        placeholder="e.g. Swift, Thar, Creta..."
-                        value={carModelSearch}
-                        onChange={(e) => {
-                          setCarModelSearch(e.target.value);
-                          setSelectedCarCategory(null);
-                        }}
-                      />
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2 bg-slate-900 p-2 rounded-md text-white shadow-md group-focus-within:bg-blue-600 transition-colors">
-                        <Search size={20} />
-                      </div>
-                  </div>
-                  <div className="flex items-center justify-center">
-                     <VoiceInput onResult={setCarModelSearch} isDark={isDark} />
-                  </div>
-              </div>
-          </div>
-
-          {carModelSearch.length > 2 && Object.keys(carMatchCategories).length > 0 && (
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-8 text-left">
-              {Object.keys(carMatchCategories).map(cat => (
-                <button
-                  key={cat}
-                  onClick={() => setSelectedCarCategory(cat)}
-                  className={`p-4 rounded-lg border transition-all flex items-center justify-between group ${isDark ? 'bg-slate-800 border-slate-700 hover:border-blue-500' : 'bg-white border-slate-200 hover:border-blue-400 hover:shadow-md'}`}
-                >
-                  <span className={`font-semibold group-hover:text-blue-700 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{cat}</span>
-                  <span className={`text-xs px-2 py-1 rounded font-mono group-hover:bg-blue-50 group-hover:text-blue-700 ${isDark ? 'bg-slate-700 text-slate-400' : 'bg-slate-100 text-slate-600'}`}>
-                    {carMatchCategories[cat].length}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  const renderSettings = () => (
-    <div className="animate-fade-in space-y-6 pb-10 max-w-4xl mx-auto overflow-y-auto h-full px-2">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>Settings</h1>
-        <span className={`text-sm px-4 py-2 rounded-full hidden sm:inline-block ${isDark ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>System Configuration</span>
-      </div>
-
-      <div className={`rounded-lg shadow-sm border p-6 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-        <h2 className={`text-lg font-bold mb-4 flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
-           <Sun size={20} className={isDark ? 'text-orange-400' : 'text-orange-600'}/>
-           Appearance
-        </h2>
-        <div className="flex gap-4">
-           <button 
-             onClick={() => setTheme('light')} 
-             className={`flex-1 p-4 rounded-lg border-2 flex items-center justify-center gap-2 transition-all ${!isDark ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-700 bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
-           >
-              <Sun size={20}/> Light Mode
-           </button>
-           <button 
-             onClick={() => setTheme('dark')} 
-             className={`flex-1 p-4 rounded-lg border-2 flex items-center justify-center gap-2 transition-all ${isDark ? 'border-blue-500 bg-slate-700 text-blue-400' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
-           >
-              <Moon size={20}/> Dark Mode
-           </button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className={`rounded-lg shadow-sm border p-6 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-          <h2 className={`text-lg font-bold mb-4 flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
-            <Settings size={20} className="text-blue-600" />
-            Business Settings
-          </h2>
-          <div className="space-y-4">
-            <div>
-              <label className={`text-sm font-semibold mb-2 block ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Business Name</label>
-              <input
-                type="text"
-                value={businessName}
-                onChange={(e) => setBusinessName(e.target.value)}
-                className={`w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDark ? 'bg-slate-900 border-slate-600 text-white' : 'bg-white border-slate-300'}`}
-              />
-            </div>
-            <div>
-              <label className={`text-sm font-semibold mb-2 block ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Low Stock Alert Threshold</label>
-              <div className="flex items-center gap-3">
-                <input
-                  type="range"
-                  min="1"
-                  max="20"
-                  value={lowStockThreshold}
-                  onChange={(e) => setLowStockThreshold(parseInt(e.target.value))}
-                  className="flex-1"
-                />
-                <div className={`flex items-center justify-center w-16 h-10 border rounded-md ${isDark ? 'bg-slate-900 border-slate-600 text-blue-400' : 'bg-blue-50 border-blue-200 text-blue-700'}`}>
-                  <span className="font-bold">{lowStockThreshold}</span>
-                </div>
-              </div>
-            </div>
-            <div>
-              <label className={`text-sm font-semibold mb-2 block ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Currency Symbol</label>
-              <input
-                type="text"
-                maxLength={3}
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value)}
-                className={`w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDark ? 'bg-slate-900 border-slate-600 text-white' : 'bg-white border-slate-300'}`}
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className={`rounded-lg shadow-sm border p-6 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-          <h2 className={`text-lg font-bold mb-4 flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
-            <Package size={20} className="text-emerald-600" />
-            Inventory Stats
-          </h2>
-          <div className="space-y-3">
-            <div className={`p-4 rounded-lg border ${isDark ? 'bg-slate-700/50 border-slate-600' : 'bg-slate-50 border-slate-200'}`}>
-              <p className="text-xs font-bold text-slate-500 uppercase mb-1">Total Products</p>
-              <p className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{products.length}</p>
-            </div>
-            <div className={`p-4 rounded-lg border ${isDark ? 'bg-slate-700/50 border-slate-600' : 'bg-slate-50 border-slate-200'}`}>
-              <p className="text-xs font-bold text-slate-500 uppercase mb-1">Total Categories</p>
-              <p className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{categories.length}</p>
-            </div>
-            <div className={`p-4 rounded-lg border ${isDark ? 'bg-slate-700/50 border-slate-600' : 'bg-slate-50 border-slate-200'}`}>
-              <p className="text-xs font-bold text-slate-500 uppercase mb-1">Inventory Value</p>
-              <p className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{currency}{totalValue.toLocaleString()}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className={`rounded-lg shadow-sm border p-6 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-        <h2 className={`text-lg font-bold mb-4 flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
-          <FileText size={20} className="text-blue-600" />
-          Data Management
-        </h2>
-        <div className="space-y-4">
-          <div>
-            <h3 className={`font-semibold mb-3 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Export Data</h3>
-            <button
-              onClick={() => {
-                const data = {
-                  exportDate: new Date().toISOString(),
-                  products,
-                  categories,
-                  transactions,
-                  notes,
-                  settings: { lowStockThreshold, businessName, currency }
-                };
-                const json = JSON.stringify(data, null, 2);
-                const blob = new Blob([json], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `autohub-backup-${new Date().getTime()}.json`;
-                a.click();
-                URL.revokeObjectURL(url);
-              }}
-              className="w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-medium transition-colors flex items-center justify-center gap-2"
-            >
-              <FileText size={16} />
-              Download Complete Backup
-            </button>
-            <p className="text-xs text-slate-500 mt-2">All products, transactions, and settings will be saved as JSON</p>
-          </div>
-          <div className="pt-2 text-center text-xs text-green-600 font-medium">
-             <CheckCircle size={12} className="inline mr-1"/> Data is secure. Manual deletion disabled.
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  if (!isAuthenticated) {
-    return <LoginScreen onLogin={handleLogin} />;
-  }
+  if (!isAuthenticated) return <LoginScreen onLogin={handleLogin} />;
 
   return (
     <div className={`flex h-screen font-sans overflow-hidden ${isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
-      {/* Mobile Backdrop for clicking outside to close menu */}
-      {isMobileMenuOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-30 md:hidden glass-effect" 
-          onClick={() => setIsMobileMenuOpen(false)}
-        />
-      )}
-
-      <aside
-        className={`flex flex-col transition-all duration-300 z-40 shrink-0 ${isDark ? 'bg-slate-900 border-r border-slate-800' : 'bg-slate-900 text-slate-300'}
-          ${isMobileMenuOpen ? 'absolute inset-y-0 left-0 w-64 shadow-2xl' : 'relative hidden md:flex'}
-          ${isSidebarCollapsed ? 'w-20' : 'w-64'}
-        `}
-      >
-        <div className={`h-16 flex items-center justify-center border-b shrink-0 ${isDark ? 'border-slate-800' : 'border-slate-800'}`}>
-          {isSidebarCollapsed ? (
-            <span className="font-bold text-white text-xl tracking-tighter">AH</span>
-          ) : (
-             <div className="flex items-center gap-2">
-               <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">A</div>
-               <div>
-                 <h1 className="text-white font-bold leading-tight truncate w-32">{businessName}</h1>
-                 <p className="text-[10px] text-slate-500 uppercase tracking-widest">Enterprise</p>
-               </div>
-             </div>
-          )}
-        </div>
-
-        <nav className="flex-1 py-6 space-y-1 overflow-y-auto custom-scrollbar px-2">
-          <SidebarItem collapsed={isSidebarCollapsed} icon={LayoutDashboard} label="Dashboard" active={activeTab === 'dashboard'} onClick={() => { setActiveTab('dashboard'); setIsMobileMenuOpen(false); }} />
-          <SidebarItem collapsed={isSidebarCollapsed} icon={Package} label="Inventory Master" active={activeTab === 'inventory'} onClick={() => { setActiveTab('inventory'); setIsMobileMenuOpen(false); }} />
-          <SidebarItem collapsed={isSidebarCollapsed} icon={Car} label="Car Finder" active={activeTab === 'related'} onClick={() => { setActiveTab('related'); setIsMobileMenuOpen(false); }} />
-
-          <div className="my-4 border-t border-slate-800 mx-2"></div>
-
-          <SidebarItem collapsed={isSidebarCollapsed} icon={Settings} label="Settings" active={activeTab === 'settings'} onClick={() => { setActiveTab('settings'); setIsMobileMenuOpen(false); }} />
-        </nav>
-
-        <div className="p-4 border-t border-slate-800 shrink-0">
-           <button onClick={handleLogout} className={`flex items-center w-full text-slate-400 hover:text-white transition-colors ${isSidebarCollapsed ? 'justify-center' : 'space-x-3 px-2'}`}>
-             <LogOut size={20} />
-             {!isSidebarCollapsed && <span className="text-sm font-medium">Sign Out</span>}
-           </button>
-        </div>
+      
+      {/* SIDEBAR (Desktop) */}
+      <aside className={`hidden md:flex flex-col w-64 border-r z-20 ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-slate-900 text-slate-300'}`}>
+         <div className="h-16 flex items-center px-6 font-bold text-white text-xl tracking-wider">AH Enterprise</div>
+         <nav className="flex-1 py-6 space-y-1 px-3">
+            {[ 
+               {id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard'},
+               {id: 'inventory', icon: Package, label: 'Inventory'},
+               {id: 'related', icon: Car, label: 'Car Finder'},
+               {id: 'settings', icon: Settings, label: 'Settings'},
+            ].map(item => (
+               <button key={item.id} onClick={() => setActiveTab(item.id)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === item.id ? 'bg-blue-600 text-white shadow-md' : 'hover:bg-slate-800 text-slate-400'}`}>
+                  <item.icon size={20}/> {item.label}
+               </button>
+            ))}
+         </nav>
+         <button onClick={handleLogout} className="m-4 flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white"><LogOut size={20}/> Sign Out</button>
       </aside>
 
-      <main className="flex-1 flex flex-col h-full overflow-hidden relative min-w-0">
-        <header className={`h-16 border-b flex items-center justify-between px-6 shadow-sm z-30 shrink-0 ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
-          <div className="flex items-center gap-4">
-            <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="md:hidden text-slate-600"><Menu size={24} /></button>
-            <button onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} className={`hidden md:block transition-colors ${isDark ? 'text-slate-400 hover:text-white' : 'text-slate-400 hover:text-slate-800'}`}>
-               {isSidebarCollapsed ? <Menu size={20}/> : <ChevronLeft size={20}/>}
-            </button>
-            <h2 className={`text-lg font-bold capitalize hidden sm:block ${isDark ? 'text-white' : 'text-slate-800'}`}>
-              {activeTab === 'related' ? 'Compatibility Engine' : activeTab === 'settings' ? 'Settings' : activeTab}
-            </h2>
-          </div>
+      {/* MAIN CONTENT */}
+      <main className="flex-1 flex flex-col relative w-full">
+         {/* HEADER */}
+         <header className={`h-16 border-b flex items-center justify-between px-4 shrink-0 ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+            <div className="flex items-center gap-3">
+               <button onClick={() => setIsMobileMenuOpen(true)} className="md:hidden"><Menu size={24} className={isDark ? 'text-white' : 'text-slate-800'}/></button>
+               <h1 className={`font-bold text-lg capitalize ${isDark ? 'text-white' : 'text-slate-800'}`}>{activeTab}</h1>
+            </div>
+            <div className="flex gap-4">
+               <button onClick={() => setShowNotifications(!showNotifications)} className="relative">
+                  <Bell size={24} className={isDark ? 'text-slate-400' : 'text-slate-600'}/>
+                  {lowStockItems.length > 0 && <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></span>}
+               </button>
+            </div>
+         </header>
 
-          <div className="flex items-center gap-6">
-              <div className={`hidden md:flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full ${isDark ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
-                <span className="w-2 h-2 rounded-full bg-emerald-500"></span> System Online
-              </div>
-
-              <div className="relative">
-                  <button 
-                    onClick={() => setShowNotifications(!showNotifications)}
-                    className={`p-2 relative rounded-full transition-colors ${isDark ? 'hover:bg-slate-800 text-slate-400 hover:text-white' : 'hover:bg-slate-100 text-slate-500 hover:text-slate-800'}`}
-                  >
-                    <Bell size={20} />
-                    {lowStockItems.length > 0 && <span className="absolute top-1.5 right-2 h-2 w-2 bg-red-500 rounded-full border border-white"></span>}
-                  </button>
-
-                  {/* Backdrop for notifications */}
-                  {showNotifications && <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)}></div>}
-
-                  {showNotifications && (
-                    <div className={`absolute right-0 mt-2 w-80 rounded-lg shadow-xl border z-50 overflow-hidden animate-scale-in origin-top-right ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-                      <div className={`p-3 border-b font-bold flex justify-between items-center text-sm ${isDark ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-slate-50 border-slate-100 text-slate-700'}`}>
-                        <span>Alerts ({lowStockItems.length})</span>
-                        <button onClick={() => setShowNotifications(false)}><X size={14}/></button>
-                      </div>
-                      <div className="max-h-64 overflow-y-auto">
-                        {lowStockItems.length > 0 ? (
-                          lowStockItems.map(item => (
-                            <div key={item.id} className={`p-3 border-b transition-colors flex items-start gap-3 cursor-pointer ${isDark ? 'border-slate-700 hover:bg-slate-700' : 'border-slate-50 hover:bg-red-50'}`} onClick={() => {setSelectedProductForDetail(item); setShowNotifications(false);}}>
-                              <AlertTriangle size={16} className="text-red-500 mt-0.5 shrink-0" />
-                              <div>
-                                <p className={`text-sm font-semibold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{item.name}</p>
-                                <p className="text-xs text-red-600 font-medium">Low Stock: {item.stock} units</p>
-                              </div>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="p-4 text-center text-slate-400 text-sm">All systems normal.</div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-              </div>
-          </div>
-        </header>
-
-        <div className={`flex-1 overflow-y-auto p-2 sm:p-6 scroll-smooth ${isDark ? 'bg-slate-950' : 'bg-slate-50/50'}`}>
-          {activeTab === 'dashboard' && renderDashboard()}
-          {activeTab === 'inventory' && renderInventory()}
-          {activeTab === 'related' && renderCarSearch()}
-          {activeTab === 'settings' && renderSettings()}
-        </div>
+         {/* BODY */}
+         <div className="flex-1 overflow-hidden relative">
+            {activeTab === 'dashboard' && renderDashboard()}
+            {activeTab === 'inventory' && renderInventory()}
+            {activeTab === 'related' && renderCarSearch()}
+            {activeTab === 'settings' && renderSettings()}
+         </div>
       </main>
 
-      {/* Floating AI Assistant */}
+      {/* MOBILE SIDEBAR OVERLAY */}
+      {isMobileMenuOpen && (
+         <div className="fixed inset-0 z-50 flex">
+            <div className="absolute inset-0 bg-black/50" onClick={() => setIsMobileMenuOpen(false)}></div>
+            <div className={`relative w-64 h-full shadow-2xl flex flex-col animate-slide-right ${isDark ? 'bg-slate-900' : 'bg-slate-800 text-white'}`}>
+               <div className="h-16 flex items-center justify-between px-6 border-b border-slate-700">
+                  <span className="font-bold text-xl">AutoHub</span>
+                  <button onClick={() => setIsMobileMenuOpen(false)}><X size={24}/></button>
+               </div>
+               <nav className="flex-1 py-6 space-y-2 px-3">
+                  {[ 
+                     {id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard'},
+                     {id: 'inventory', icon: Package, label: 'Inventory'},
+                     {id: 'related', icon: Car, label: 'Car Finder'},
+                     {id: 'settings', icon: Settings, label: 'Settings'},
+                  ].map(item => (
+                     <button key={item.id} onClick={() => {setActiveTab(item.id); setIsMobileMenuOpen(false);}} className={`w-full flex items-center gap-4 px-4 py-4 rounded-xl text-lg font-medium transition-colors ${activeTab === item.id ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}>
+                        <item.icon size={24}/> {item.label}
+                     </button>
+                  ))}
+               </nav>
+               <button onClick={handleLogout} className="m-4 flex items-center gap-3 px-4 py-4 text-red-400 font-bold"><LogOut size={24}/> Sign Out</button>
+            </div>
+         </div>
+      )}
+
+      {/* COMPONENTS */}
       <AIChatBot products={products} transactions={transactions} isDark={isDark} businessName={businessName} />
-
-      <ProductDetailModal 
-         product={selectedProductForDetail} 
-         onClose={() => setSelectedProductForDetail(null)} 
-         onStockChange={handleStockChange}
-         isDark={isDark}
-      />
-
+      
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm" onClick={() => setIsAddModalOpen(false)}>
-          <div className={`rounded-lg shadow-2xl w-full max-w-md overflow-hidden animate-scale-in ${isDark ? 'bg-slate-800' : 'bg-white'}`} onClick={e => e.stopPropagation()}>
-            <div className={`p-4 border-b flex justify-between items-center ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-              <h3 className={`font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>New Product Entry</h3>
-              <button onClick={() => setIsAddModalOpen(false)}><X size={20} className="text-slate-400 hover:text-slate-700"/></button>
-            </div>
-            <form onSubmit={handleAddProduct} className="p-6 space-y-4">
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase">Product Name</label>
-                <input required type="text" className={`w-full mt-1 border rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none ${isDark ? 'bg-slate-900 border-slate-600 text-white' : 'border-slate-300'}`} value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase">Category</label>
-                <select className={`w-full mt-1 border rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none ${isDark ? 'bg-slate-900 border-slate-600 text-white' : 'border-slate-300'}`} value={newProduct.category} onChange={e => setNewProduct({...newProduct, category: e.target.value})}>
-                  <option value="">Select...</option>
-                  {categories.slice(1).map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-bold text-slate-500 uppercase">Price (₹)</label>
-                  <input required type="number" className={`w-full mt-1 border rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none ${isDark ? 'bg-slate-900 border-slate-600 text-white' : 'border-slate-300'}`} value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: e.target.value})} />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-500 uppercase">Initial Stock</label>
-                  <input type="number" className={`w-full mt-1 border rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none ${isDark ? 'bg-slate-900 border-slate-600 text-white' : 'border-slate-300'}`} value={newProduct.stock} onChange={e => setNewProduct({...newProduct, stock: e.target.value})} />
-                </div>
-              </div>
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase">Compatible Cars</label>
-                <input type="text" className={`w-full mt-1 border rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none ${isDark ? 'bg-slate-900 border-slate-600 text-white' : 'border-slate-300'}`} placeholder="e.g. Swift, Universal" value={newProduct.compatibleCars} onChange={e => setNewProduct({...newProduct, compatibleCars: e.target.value})} />
-              </div>
-              <button type="submit" className={`w-full font-medium py-2.5 rounded-md transition-colors mt-2 ${isDark ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-slate-900 hover:bg-slate-800 text-white'}`}>Create Record</button>
-            </form>
-          </div>
+        <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setIsAddModalOpen(false)}>
+           <div className={`w-full md:max-w-md rounded-t-2xl md:rounded-xl p-6 animate-slide-up ${isDark ? 'bg-slate-900' : 'bg-white'}`} onClick={e => e.stopPropagation()}>
+              <h2 className={`text-xl font-bold mb-4 ${isDark ? 'text-white' : 'text-slate-900'}`}>Add New Product</h2>
+              <form onSubmit={handleAddProduct} className="space-y-4">
+                 <input type="text" placeholder="Name" required className={`w-full p-3 rounded-lg border ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50'}`} value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})}/>
+                 <div className="flex gap-4">
+                    <input type="number" placeholder="Price" required className={`flex-1 p-3 rounded-lg border ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50'}`} value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: e.target.value})}/>
+                    <input type="number" placeholder="Stock" className={`flex-1 p-3 rounded-lg border ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50'}`} value={newProduct.stock} onChange={e => setNewProduct({...newProduct, stock: e.target.value})}/>
+                 </div>
+                 <select className={`w-full p-3 rounded-lg border ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50'}`} value={newProduct.category} onChange={e => setNewProduct({...newProduct, category: e.target.value})}>
+                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                 </select>
+                 <button type="submit" className="w-full py-4 bg-blue-600 text-white font-bold rounded-xl shadow-lg">Save Product</button>
+              </form>
+           </div>
         </div>
       )}
-
-      {isCategoryModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm" onClick={() => setIsCategoryModalOpen(false)}>
-          <div className={`rounded-lg shadow-xl w-full max-w-sm overflow-hidden animate-scale-in ${isDark ? 'bg-slate-800' : 'bg-white'}`} onClick={e => e.stopPropagation()}>
-            <div className={`p-4 border-b flex justify-between items-center ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-              <h3 className={`font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>Add Category</h3>
-              <button onClick={() => setIsCategoryModalOpen(false)}><X size={20} className="text-slate-400 hover:text-slate-700"/></button>
-            </div>
-            <form onSubmit={handleAddCategory} className="p-6 space-y-4">
-              <input required autoFocus type="text" className={`w-full border rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none ${isDark ? 'bg-slate-900 border-slate-600 text-white' : 'border-slate-300'}`} placeholder="Category Name" value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} />
-              <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-md transition-colors">Save</button>
-            </form>
-          </div>
-        </div>
-      )}
+      
+      <ProductDetailModal product={selectedProductForDetail} onClose={() => setSelectedProductForDetail(null)} onStockChange={handleStockChange} isDark={isDark} />
     </div>
   );
 }
