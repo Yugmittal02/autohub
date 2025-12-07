@@ -1,338 +1,351 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Minus, Search, X, Trash2, Save, Book, Car, ChevronRight, Home, ArrowLeft } from 'lucide-react';
+import { Plus, Minus, Search, X, Trash2, ArrowLeft, Book, Car, ChevronRight, FileText } from 'lucide-react';
 
 // --- DATA SAVE/LOAD ---
 const loadData = () => {
-  if (typeof window === 'undefined') return { pages: [], items: [] };
-  const saved = localStorage.getItem('register-stock-data');
+  if (typeof window === 'undefined') return { pages: [], entries: [] };
+  const saved = localStorage.getItem('notebook-stock-data');
   if (saved) return JSON.parse(saved);
   
-  // Dummy Data (Example ke liye)
+  // Example Data (Copy Jaisa)
   return {
     pages: [
-      { id: 1, name: 'Page 1 (Rack A)' },
-      { id: 2, name: 'Page 2 (Drawers)' },
-      { id: 3, name: 'Godown' }
+      { id: 1, pageNo: 1, itemName: '7D Floor Mats' },
+      { id: 2, pageNo: 2, itemName: 'Android Screen 9 Inch' },
+      { id: 3, pageNo: 3, itemName: 'LED Headlights' }
     ],
-    items: [
-      { id: 101, pageId: 1, name: 'Brake Pads', cars: 'Swift, Dzire', qty: 10 },
-      { id: 102, pageId: 1, name: 'Air Filter', cars: 'Creta, Seltos', qty: 5 },
-      { id: 103, pageId: 2, name: '9" Android', cars: 'Universal, Swift, Thar', qty: 4 },
-      { id: 104, pageId: 3, name: 'Bumper', cars: 'Thar', qty: 2 }
+    entries: [
+      { id: 101, pageId: 1, car: 'Swift', qty: 5 },
+      { id: 102, pageId: 1, car: 'Creta', qty: 2 },
+      { id: 103, pageId: 2, car: 'Universal', qty: 10 },
+      { id: 104, pageId: 3, car: 'Thar', qty: 4 }
     ]
   };
 };
 
-export default function RegisterApp() {
+export default function NotebookApp() {
   const [data, setData] = useState(loadData);
-  const [currentView, setCurrentView] = useState('index'); // 'index', 'page', 'finder'
-  const [selectedPage, setSelectedPage] = useState(null);
-  const [carSearch, setCarSearch] = useState('');
+  const [view, setView] = useState('index'); // 'index', 'page', 'search'
+  const [activePage, setActivePage] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
   
-  // Modals State
-  const [isAddPageOpen, setIsAddPageOpen] = useState(false);
-  const [isAddItemOpen, setIsAddItemOpen] = useState(false);
-  const [inputs, setInputs] = useState({ pageName: '', itemName: '', itemCars: '', itemQty: '' });
+  // Modals
+  const [isNewPageOpen, setIsNewPageOpen] = useState(false);
+  const [isNewEntryOpen, setIsNewEntryOpen] = useState(false);
+  const [input, setInput] = useState({ itemName: '', carName: '', qty: '' });
 
-  // Save on Change
   useEffect(() => {
-    localStorage.setItem('register-stock-data', JSON.stringify(data));
+    localStorage.setItem('notebook-stock-data', JSON.stringify(data));
   }, [data]);
 
   // --- ACTIONS ---
 
-  // 1. Add Page
+  // 1. Naya Page Banaye (Naya Item Register Kare)
   const handleAddPage = (e) => {
     e.preventDefault();
-    if (!inputs.pageName) return;
-    const newPage = { id: Date.now(), name: inputs.pageName };
+    if (!input.itemName) return;
+    const nextPageNo = data.pages.length + 1;
+    const newPage = { id: Date.now(), pageNo: nextPageNo, itemName: input.itemName };
     setData({ ...data, pages: [...data.pages, newPage] });
-    setInputs({ ...inputs, pageName: '' });
-    setIsAddPageOpen(false);
+    setInput({ ...input, itemName: '' });
+    setIsNewPageOpen(false);
   };
 
-  // 2. Add Item
-  const handleAddItem = (e) => {
+  // 2. Page ke andar Gadi ki Entry kare
+  const handleAddEntry = (e) => {
     e.preventDefault();
-    if (!inputs.itemName) return;
-    const newItem = {
+    if (!input.carName) return;
+    const newEntry = {
       id: Date.now(),
-      pageId: selectedPage.id,
-      name: inputs.itemName,
-      cars: inputs.itemCars || 'Universal', // Kis gadi ka hai
-      qty: parseInt(inputs.itemQty) || 0
+      pageId: activePage.id,
+      car: input.carName,
+      qty: parseInt(input.qty) || 0
     };
-    setData({ ...data, items: [newItem, ...data.items] }); // Naya item upar
-    setInputs({ ...inputs, itemName: '', itemCars: '', itemQty: '' });
-    setIsAddItemOpen(false);
+    setData({ ...data, entries: [newEntry, ...data.entries] });
+    setInput({ ...input, carName: '', qty: '' });
+    setIsNewEntryOpen(false);
   };
 
-  // 3. Update Stock
-  const updateStock = (itemId, amount) => {
-    const updatedItems = data.items.map(item => {
-      if (item.id === itemId) {
-        return { ...item, qty: Math.max(0, item.qty + amount) };
-      }
-      return item;
+  // 3. Stock Update (+/-)
+  const updateQty = (entryId, amount) => {
+    setData({
+      ...data,
+      entries: data.entries.map(e => e.id === entryId ? { ...e, qty: Math.max(0, e.qty + amount) } : e)
     });
-    setData({ ...data, items: updatedItems });
   };
 
   // 4. Delete
-  const deletePage = (id, e) => {
-    e.stopPropagation();
-    if(window.confirm("Pura Page delete ho jayega aur uska maal bhi. Kar du?")) {
+  const deletePage = (id) => {
+    if(window.confirm("Pura Page faad du (Delete)? Sab data chala jayega.")) {
       setData({
         pages: data.pages.filter(p => p.id !== id),
-        items: data.items.filter(i => i.pageId !== id)
+        entries: data.entries.filter(e => e.pageId !== id)
       });
     }
   };
 
-  const deleteItem = (id) => {
-    if(window.confirm("Item hata du?")) {
-      setData({ ...data, items: data.items.filter(i => i.id !== id) });
+  const deleteEntry = (id) => {
+    if(window.confirm("Entry hata du?")) {
+      setData({ ...data, entries: data.entries.filter(e => e.id !== id) });
     }
   };
 
-  // --- FILTERS ---
-  const pageItems = selectedPage ? data.items.filter(i => i.pageId === selectedPage.id) : [];
-  
-  const carFinderResults = useMemo(() => {
-    if (!carSearch) return [];
-    return data.items.filter(i => 
-      i.cars.toLowerCase().includes(carSearch.toLowerCase()) || 
-      i.name.toLowerCase().includes(carSearch.toLowerCase())
-    );
-  }, [data.items, carSearch]);
+  // --- CALCULATIONS ---
+  // Ek page par total kitne piece hain
+  const getPageTotal = (pageId) => {
+    return data.entries.filter(e => e.pageId === pageId).reduce((acc, curr) => acc + curr.qty, 0);
+  };
 
-  // --- RENDERERS ---
+  // Search Logic (Car Finder)
+  const searchResults = useMemo(() => {
+    if (!searchTerm) return [];
+    return data.entries.filter(e => e.car.toLowerCase().includes(searchTerm.toLowerCase()));
+  }, [data.entries, searchTerm]);
 
-  // VIEW 1: INDEX PAGE (Registers List)
+  // --- VIEWS ---
+
+  // 1. INDEX (REGISTER KA PEHLA PANNA)
   const renderIndex = () => (
-    <div className="p-4 pb-24">
-      <h2 className="text-xl font-bold mb-4 text-gray-800 flex items-center gap-2">
-        <Book size={24}/> Index / Pages
-      </h2>
-      <div className="grid gap-3">
-        {data.pages.map(page => {
-           const itemCount = data.items.filter(i => i.pageId === page.id).length;
-           return (
+    <div className="pb-24">
+      {/* Header */}
+      <div className="bg-yellow-100 p-4 border-b-2 border-yellow-300 sticky top-0 z-10 shadow-sm">
+        <h1 className="text-2xl font-extrabold text-yellow-900 flex items-center gap-2">
+          <Book className="text-yellow-800"/> INDEX
+        </h1>
+        <p className="text-yellow-800 text-sm font-bold opacity-70">Total Pages: {data.pages.length}</p>
+      </div>
+
+      {/* Index Lines */}
+      <div className="p-2">
+        {/* Table Head */}
+        <div className="flex px-3 py-2 border-b-2 border-gray-300 text-gray-500 text-xs font-bold uppercase">
+          <div className="w-12">Pg.No</div>
+          <div className="flex-1">Item Name (Subject)</div>
+          <div className="w-16 text-center">Total Qty</div>
+        </div>
+
+        {/* Lines */}
+        <div className="bg-white min-h-[60vh] shadow-sm border border-gray-200">
+          {data.pages.map((page, index) => (
             <div 
               key={page.id} 
-              onClick={() => { setSelectedPage(page); setCurrentView('page'); }}
-              className="bg-white p-5 rounded-lg border-2 border-gray-300 shadow-sm flex justify-between items-center active:bg-blue-50 cursor-pointer"
+              onClick={() => { setActivePage(page); setView('page'); }}
+              className="flex items-center px-3 py-4 border-b border-blue-100 hover:bg-blue-50 cursor-pointer"
             >
-              <div>
-                <h3 className="font-bold text-lg text-black">{page.name}</h3>
-                <span className="text-sm text-gray-500">{itemCount} Items</span>
+              <div className="w-12 font-bold text-red-500 font-mono text-lg">{index + 1}</div>
+              <div className="flex-1 font-bold text-gray-800 text-lg leading-tight">
+                {page.itemName}
               </div>
-              <div className="flex items-center gap-3">
-                <ChevronRight size={24} className="text-gray-400"/>
-                <button onClick={(e) => deletePage(page.id, e)} className="p-2 text-red-400"><Trash2 size={18}/></button>
+              <div className="w-16 text-center">
+                <span className="bg-gray-200 text-gray-800 px-2 py-1 rounded font-bold text-sm">
+                  {getPageTotal(page.id)}
+                </span>
               </div>
+              <ChevronRight className="text-gray-300" size={20}/>
             </div>
-           )
-        })}
+          ))}
+          {data.pages.length === 0 && (
+            <div className="text-center p-10 text-gray-400">Copy khali hai. Naya page banayein.</div>
+          )}
+        </div>
       </div>
-      
-      {data.pages.length === 0 && <div className="text-center text-gray-400 mt-10">Koi Page nahi hai. Naya Page banayein.</div>}
 
-      <button onClick={() => setIsAddPageOpen(true)} className="fixed bottom-24 right-6 bg-blue-700 text-white px-6 py-3 rounded-full font-bold shadow-lg flex items-center gap-2">
-        <Plus size={20}/> New Page
+      {/* FAB Button */}
+      <button 
+        onClick={() => setIsNewPageOpen(true)}
+        className="fixed bottom-24 right-6 bg-yellow-500 text-yellow-900 w-16 h-16 rounded-full shadow-lg border-4 border-white flex items-center justify-center active:scale-95"
+      >
+        <Plus size={32} strokeWidth={3}/>
       </button>
     </div>
   );
 
-  // VIEW 2: PAGE DETAILS (Item List)
-  const renderPageDetail = () => (
-    <div className="pb-24 bg-white min-h-screen">
-      {/* Page Header */}
-      <div className="bg-gray-100 p-4 border-b border-gray-300 sticky top-0 z-10 flex items-center justify-between">
-        <button onClick={() => setCurrentView('index')} className="flex items-center gap-1 font-bold text-blue-700">
-          <ArrowLeft size={20}/> Index
-        </button>
-        <h2 className="font-bold text-lg truncate max-w-[200px]">{selectedPage.name}</h2>
-        <div className="w-8"></div> {/* Spacer */}
-      </div>
-
-      {/* Excel Table Header */}
-      <div className="flex bg-gray-200 p-2 text-xs font-bold uppercase border-b border-gray-400">
-        <div className="flex-[2]">Item Name</div>
-        <div className="flex-[1.5]">Cars</div>
-        <div className="flex-[1.5] text-center">Qty</div>
-      </div>
-
-      {/* Items List */}
-      <div className="divide-y divide-gray-200">
-        {pageItems.map((item, idx) => (
-          <div key={item.id} className={`flex items-center p-3 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-            <div className="flex-[2] pr-2">
-              <div className="font-bold text-base text-black leading-tight">{item.name}</div>
-              <button onClick={() => deleteItem(item.id)} className="text-[10px] text-red-500 mt-1 flex gap-1"><Trash2 size={10}/> Del</button>
-            </div>
-            <div className="flex-[1.5] text-xs text-gray-600 pr-1 border-l border-gray-300 pl-2">
-              {item.cars}
-            </div>
-            <div className="flex-[1.5] flex items-center justify-center gap-2 border-l border-gray-300 pl-2">
-              <button onClick={() => updateStock(item.id, -1)} className="w-8 h-8 bg-red-100 border border-red-300 text-red-700 rounded flex items-center justify-center"><Minus size={16}/></button>
-              <span className="font-bold text-lg w-6 text-center">{item.qty}</span>
-              <button onClick={() => updateStock(item.id, 1)} className="w-8 h-8 bg-green-100 border border-green-300 text-green-700 rounded flex items-center justify-center"><Plus size={16}/></button>
-            </div>
+  // 2. PAGE VIEW (SINGLE ITEM PAGE)
+  const renderPage = () => {
+    const entries = data.entries.filter(e => e.pageId === activePage.id);
+    
+    return (
+      <div className="pb-24 bg-white min-h-screen">
+        {/* Page Header (Top Margin) */}
+        <div className="sticky top-0 z-10 bg-white border-b-2 border-red-200 shadow-sm">
+          <div className="flex items-center gap-2 p-3 bg-red-50 text-red-900">
+             <button onClick={() => setView('index')} className="p-2 -ml-2">
+               <ArrowLeft size={24}/>
+             </button>
+             <div className="flex-1">
+               <p className="text-xs font-bold uppercase text-red-400">Page No. {data.pages.indexOf(activePage) + 1}</p>
+               <h2 className="text-xl font-black uppercase tracking-tight leading-none">{activePage.itemName}</h2>
+             </div>
+             <button onClick={() => deletePage(activePage.id)} className="text-red-300 p-2"><Trash2 size={20}/></button>
           </div>
-        ))}
+          {/* Column Headers */}
+          <div className="flex bg-red-100 p-2 text-red-900 text-xs font-bold uppercase border-t border-red-200">
+            <div className="flex-[2]">Car Name (Vivran)</div>
+            <div className="flex-[1.5] text-center">Quantity</div>
+          </div>
+        </div>
+
+        {/* Ruled Paper Lines */}
+        <div className="w-full" style={{ backgroundImage: 'linear-gradient(#e5e7eb 1px, transparent 1px)', backgroundSize: '100% 3rem' }}>
+          {entries.map((entry) => (
+            <div key={entry.id} className="flex items-center px-4 h-12 border-b border-transparent">
+              {/* Car Name */}
+              <div className="flex-[2] flex items-center justify-between pr-2">
+                 <span className="text-lg font-bold text-gray-800">{entry.car}</span>
+                 <button onClick={() => deleteEntry(entry.id)} className="text-gray-300"><X size={14}/></button>
+              </div>
+
+              {/* Qty Controls */}
+              <div className="flex-[1.5] flex items-center justify-center gap-3">
+                 <button onClick={() => updateQty(entry.id, -1)} className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full border border-gray-300 active:bg-red-200"><Minus size={16}/></button>
+                 <span className="text-xl font-bold font-mono w-6 text-center">{entry.qty}</span>
+                 <button onClick={() => updateQty(entry.id, 1)} className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full border border-gray-300 active:bg-green-200"><Plus size={16}/></button>
+              </div>
+            </div>
+          ))}
+          {/* Empty Lines Effect */}
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="h-12 border-b border-gray-200 w-full"></div>
+          ))}
+        </div>
+
+        {/* FAB */}
+        <button 
+          onClick={() => setIsNewEntryOpen(true)}
+          className="fixed bottom-24 right-6 bg-blue-600 text-white w-16 h-16 rounded-full shadow-lg border-4 border-white flex items-center justify-center active:scale-95"
+        >
+          <Plus size={32} strokeWidth={3}/>
+        </button>
       </div>
+    );
+  };
 
-      {pageItems.length === 0 && <div className="text-center p-8 text-gray-400">Is page par koi item nahi hai.</div>}
-
-      <button onClick={() => setIsAddItemOpen(true)} className="fixed bottom-24 right-6 bg-blue-700 text-white w-14 h-14 rounded-full font-bold shadow-lg flex items-center justify-center border-2 border-white">
-        <Plus size={28}/>
-      </button>
-    </div>
-  );
-
-  // VIEW 3: CAR FINDER (Search)
-  const renderCarFinder = () => (
-    <div className="p-4 pb-24 min-h-screen bg-white">
-      <div className="sticky top-0 bg-white z-10 pb-4 border-b">
-        <h2 className="text-xl font-bold mb-4 text-black flex items-center gap-2">
-          <Car size={24} className="text-blue-600"/> Car Part Finder
+  // 3. CAR FINDER (GLOBAL SEARCH)
+  const renderSearch = () => (
+    <div className="p-4 pb-24 min-h-screen bg-gray-50">
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 sticky top-4 z-10">
+        <h2 className="text-lg font-bold mb-2 flex items-center gap-2">
+          <Car className="text-blue-600"/> Car Finder
         </h2>
         <div className="relative">
           <input 
             autoFocus
-            type="text" 
-            placeholder="Type Car Name (e.g. Swift)..." 
-            className="w-full border-2 border-black rounded-lg p-3 pl-10 text-lg outline-none focus:border-blue-600"
-            value={carSearch}
-            onChange={e => setCarSearch(e.target.value)}
+            type="text"
+            placeholder="Gadi ka naam likho (e.g. Swift)..."
+            className="w-full p-3 pl-10 border-2 border-gray-300 rounded-lg text-lg outline-none focus:border-blue-500"
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
           />
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"/>
-          {carSearch && <button onClick={() => setCarSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2"><X size={20}/></button>}
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20}/>
+          {searchTerm && <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"><X size={20}/></button>}
         </div>
       </div>
 
       <div className="mt-4 space-y-3">
-        {carSearch.length > 1 ? (
-          carFinderResults.length > 0 ? (
-            carFinderResults.map(item => {
-              // Find Page Name
-              const pageName = data.pages.find(p => p.id === item.pageId)?.name || 'Unknown Page';
-              return (
-                <div key={item.id} className="bg-yellow-50 border-2 border-yellow-200 rounded-lg p-4 shadow-sm">
-                  <div className="flex justify-between items-start">
-                    <h3 className="font-bold text-lg text-black">{item.name}</h3>
-                    <span className={`px-2 py-1 rounded text-xs font-bold ${item.qty > 0 ? 'bg-green-200 text-green-800' : 'bg-red-200 text-red-800'}`}>
-                      {item.qty} Qty
-                    </span>
-                  </div>
-                  <div className="mt-2 text-sm text-gray-700">
-                    <span className="font-bold text-gray-500 uppercase text-[10px]">Location:</span><br/>
-                    {pageName}
-                  </div>
-                  <div className="mt-1 text-sm text-gray-600">
-                    <span className="font-bold text-gray-500 uppercase text-[10px]">Compatible:</span><br/>
-                    {item.cars}
-                  </div>
-                </div>
-              );
-            })
-          ) : (
-            <div className="text-center text-gray-500 mt-10">Is gadi ka koi item nahi mila.</div>
-          )
-        ) : (
-          <div className="text-center text-gray-400 mt-10">Gadi ka naam likhein...</div>
+        {searchTerm && searchResults.length === 0 && (
+          <div className="text-center mt-10 text-gray-400">Is gadi ka koi item nahi mila.</div>
         )}
+
+        {searchResults.map(entry => {
+          // Find Page Name
+          const page = data.pages.find(p => p.id === entry.pageId);
+          return (
+            <div key={entry.id} onClick={() => { setActivePage(page); setView('page'); }} className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 cursor-pointer active:bg-blue-50">
+              <div className="flex justify-between items-start">
+                <div>
+                   <h3 className="font-bold text-lg text-blue-800">{page?.itemName}</h3>
+                   <div className="flex items-center gap-2 mt-1">
+                      <Car size={14} className="text-gray-400"/>
+                      <span className="font-bold text-gray-700">{entry.car}</span>
+                   </div>
+                </div>
+                <div className={`px-3 py-1 rounded text-sm font-bold ${entry.qty > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                  Qty: {entry.qty}
+                </div>
+              </div>
+              <div className="mt-2 text-xs text-gray-400 text-right uppercase font-bold tracking-wider">
+                Page No: {data.pages.indexOf(page) + 1}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
 
   return (
-    <div className="bg-gray-50 min-h-screen font-sans">
+    <div className="bg-gray-50 min-h-screen font-sans text-gray-900">
       
-      {/* MAIN CONTENT AREA */}
-      {currentView === 'index' && renderIndex()}
-      {currentView === 'page' && renderPageDetail()}
-      {currentView === 'finder' && renderCarFinder()}
+      {view === 'index' && renderIndex()}
+      {view === 'page' && renderPage()}
+      {view === 'search' && renderSearch()}
 
-      {/* BOTTOM NAVIGATION BAR */}
-      <div className="fixed bottom-0 left-0 w-full bg-white border-t border-gray-300 flex justify-around p-3 pb-safe z-50">
-        <button 
-          onClick={() => setCurrentView('index')} 
-          className={`flex flex-col items-center gap-1 ${currentView === 'index' || currentView === 'page' ? 'text-blue-700' : 'text-gray-400'}`}
-        >
-          <Book size={24} strokeWidth={currentView === 'index' ? 3 : 2} />
-          <span className="text-[10px] font-bold uppercase">Register</span>
+      {/* BOTTOM NAV */}
+      <div className="fixed bottom-0 w-full bg-white border-t border-gray-300 flex justify-around p-2 pb-safe z-50">
+        <button onClick={() => setView('index')} className={`flex flex-col items-center p-2 rounded-lg ${view === 'index' ? 'text-blue-700 bg-blue-50' : 'text-gray-400'}`}>
+          <Book size={24}/>
+          <span className="text-[10px] font-bold">Index</span>
         </button>
-        
-        <button 
-          onClick={() => setCurrentView('finder')} 
-          className={`flex flex-col items-center gap-1 ${currentView === 'finder' ? 'text-blue-700' : 'text-gray-400'}`}
-        >
-          <Car size={24} strokeWidth={currentView === 'finder' ? 3 : 2} />
-          <span className="text-[10px] font-bold uppercase">Car Finder</span>
+        <button onClick={() => setView('search')} className={`flex flex-col items-center p-2 rounded-lg ${view === 'search' ? 'text-blue-700 bg-blue-50' : 'text-gray-400'}`}>
+          <Search size={24}/>
+          <span className="text-[10px] font-bold">Finder</span>
         </button>
       </div>
 
-      {/* --- MODAL: ADD PAGE --- */}
-      {isAddPageOpen && (
+      {/* MODAL: NEW PAGE (ITEM) */}
+      {isNewPageOpen && (
         <div className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-sm rounded-lg p-6">
-            <h3 className="font-bold text-lg mb-4">Naya Page/Rack Banayein</h3>
+          <div className="bg-white w-full max-w-sm rounded-xl p-6 shadow-2xl animate-scale-in">
+            <h3 className="text-xl font-extrabold mb-4 text-gray-800">Naya Item (Page)</h3>
+            <label className="text-xs font-bold text-gray-500 uppercase">Item Name</label>
             <input 
               autoFocus
-              className="w-full border-2 border-black rounded p-3 mb-4 text-lg" 
-              placeholder="Page Name (e.g. Rack 1)"
-              value={inputs.pageName}
-              onChange={e => setInputs({...inputs, pageName: e.target.value})}
+              className="w-full border-2 border-gray-300 rounded-lg p-3 text-xl font-bold text-black mb-6 mt-1" 
+              placeholder="e.g. Brake Pads"
+              value={input.itemName}
+              onChange={e => setInput({...input, itemName: e.target.value})}
             />
-            <div className="flex gap-2">
-              <button onClick={() => setIsAddPageOpen(false)} className="flex-1 bg-gray-200 py-3 rounded font-bold">Cancel</button>
-              <button onClick={handleAddPage} className="flex-1 bg-blue-700 text-white py-3 rounded font-bold">Add</button>
+            <div className="flex gap-3">
+              <button onClick={() => setIsNewPageOpen(false)} className="flex-1 py-3 bg-gray-200 rounded-lg font-bold">Cancel</button>
+              <button onClick={handleAddPage} className="flex-1 py-3 bg-yellow-500 text-yellow-900 rounded-lg font-bold">Add Page</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* --- MODAL: ADD ITEM --- */}
-      {isAddItemOpen && (
+      {/* MODAL: NEW ENTRY (CAR) */}
+      {isNewEntryOpen && (
         <div className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-sm rounded-lg p-6">
-            <h3 className="font-bold text-lg mb-4">Add Item to {selectedPage?.name}</h3>
-            <div className="space-y-3">
+          <div className="bg-white w-full max-w-sm rounded-xl p-6 shadow-2xl animate-scale-in">
+            <h3 className="text-xl font-extrabold mb-1 text-gray-800">New Entry</h3>
+            <p className="text-sm text-gray-500 mb-6 font-bold">For: {activePage?.itemName}</p>
+            
+            <div className="space-y-4">
               <div>
-                <label className="text-xs font-bold text-gray-500 uppercase">Item Name</label>
+                <label className="text-xs font-bold text-gray-500 uppercase">Gadi Ka Naam (Car)</label>
                 <input 
                   autoFocus
-                  className="w-full border border-gray-400 rounded p-2 text-lg text-black" 
-                  placeholder="e.g. Brake Shoe"
-                  value={inputs.itemName}
-                  onChange={e => setInputs({...inputs, itemName: e.target.value})}
+                  className="w-full border-2 border-gray-300 rounded-lg p-3 text-lg font-bold mt-1" 
+                  placeholder="e.g. Swift"
+                  value={input.carName}
+                  onChange={e => setInput({...input, carName: e.target.value})}
                 />
               </div>
               <div>
-                <label className="text-xs font-bold text-gray-500 uppercase">Gadi Ka Naam (Compatible Cars)</label>
-                <input 
-                  className="w-full border border-gray-400 rounded p-2 text-lg text-black" 
-                  placeholder="e.g. Swift, Alto, Universal"
-                  value={inputs.itemCars}
-                  onChange={e => setInputs({...inputs, itemCars: e.target.value})}
-                />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-gray-500 uppercase">Quantity</label>
+                <label className="text-xs font-bold text-gray-500 uppercase">Quantity (Pcs)</label>
                 <input 
                   type="number"
-                  className="w-full border border-gray-400 rounded p-2 text-lg text-black" 
+                  className="w-full border-2 border-gray-300 rounded-lg p-3 text-lg font-bold mt-1" 
                   placeholder="0"
-                  value={inputs.itemQty}
-                  onChange={e => setInputs({...inputs, itemQty: e.target.value})}
+                  value={input.qty}
+                  onChange={e => setInput({...input, qty: e.target.value})}
                 />
               </div>
             </div>
-            <div className="flex gap-2 mt-6">
-              <button onClick={() => setIsAddItemOpen(false)} className="flex-1 bg-gray-200 py-3 rounded font-bold">Cancel</button>
-              <button onClick={handleAddItem} className="flex-1 bg-blue-700 text-white py-3 rounded font-bold">Save</button>
+
+            <div className="flex gap-3 mt-8">
+              <button onClick={() => setIsNewEntryOpen(false)} className="flex-1 py-3 bg-gray-200 rounded-lg font-bold">Cancel</button>
+              <button onClick={handleAddEntry} className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-bold">Save</button>
             </div>
           </div>
         </div>
