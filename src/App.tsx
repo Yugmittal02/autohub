@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Plus, Minus, Search, X, Trash2, ArrowLeft, Book, Car, 
   ChevronRight, Mic, Settings, AlertTriangle, Languages, 
-  Lock, Bell, Volume2, Save, LogOut, Grid, Download, ShieldCheck, ShieldAlert
+  Lock, Bell, Volume2, Save, LogOut, Grid, Download, ShieldCheck, ShieldAlert, CheckCircle, Smartphone
 } from 'lucide-react';
 
 // --- DICTIONARY FOR TRANSLATION ---
@@ -20,7 +20,8 @@ const dictionary = {
   "pages": "पेज लिस्ट", "arvind index": "अरविन्द इंडेक्स",
   "total": "कुल", "delete": "हटाएं", "confirm": "पुष्टि करें",
   "found in": "में मिला", "items": "सामान", "safe mode": "सुरक्षा मोड",
-  "find car": "गाड़ी खोजें", "global search": "दुकान में खोजें"
+  "find car": "गाड़ी खोजें", "global search": "दुकान में खोजें",
+  "install app": "ऐप इनस्टॉल करें", "notifications": "नोटिफिकेशन"
 };
 
 const translateText = (text) => {
@@ -65,18 +66,21 @@ export default function ArvindRegister() {
   const [activePage, setActivePage] = useState(null);
   const [pageSearchTerm, setPageSearchTerm] = useState(''); 
   const [indexSearchTerm, setIndexSearchTerm] = useState(''); 
-  const [stockSearchTerm, setStockSearchTerm] = useState(''); // NEW STATE FOR STOCK SEARCH
+  const [stockSearchTerm, setStockSearchTerm] = useState(''); 
   const [isHindi, setIsHindi] = useState(false);
   const [isSafeMode, setIsSafeMode] = useState(true); 
 
   const [isAppUnlocked, setIsAppUnlocked] = useState(false); 
   const [loginPassInput, setLoginPassInput] = useState('');
-  
   const [newPass, setNewPass] = useState('');
+  
   const [isNewPageOpen, setIsNewPageOpen] = useState(false);
   const [isNewEntryOpen, setIsNewEntryOpen] = useState(false);
   const [input, setInput] = useState({ itemName: '', carName: '', qty: '' });
+  
+  // --- INSTALL & NOTIFICATION STATE ---
   const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [notifPermission, setNotifPermission] = useState('default'); // default, granted, denied
   const audioRef = useRef(null);
 
   useEffect(() => {
@@ -84,34 +88,65 @@ export default function ArvindRegister() {
   }, [data]);
 
   useEffect(() => {
+    // Check Notification Status on Load
+    if ("Notification" in window) {
+        setNotifPermission(Notification.permission);
+    }
+
+    // Capture Install Prompt
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
+      console.log("Install Prompt Captured");
     });
   }, []);
 
+  // --- SMART INSTALL HANDLER ---
   const handleInstallClick = () => {
     if (deferredPrompt) {
+      // Automatic Prompt available
       deferredPrompt.prompt();
       deferredPrompt.userChoice.then((choiceResult) => {
-        setDeferredPrompt(null);
+        if (choiceResult.outcome === 'accepted') {
+          setDeferredPrompt(null);
+        }
       });
     } else {
-        alert("Tap 'Share' > 'Add to Home Screen' to install.");
+      // Manual Instructions (Fallback)
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      if (isIOS) {
+          alert("To Install on iPhone:\n1. Tap the 'Share' button (Square with arrow)\n2. Scroll down and tap 'Add to Home Screen'");
+      } else {
+          alert("To Install:\n1. Tap the browser menu (3 dots)\n2. Tap 'Add to Home Screen' or 'Install App'");
+      }
     }
   };
 
+  // --- SMART NOTIFICATION HANDLER ---
   const requestNotificationPermission = () => {
     if (!("Notification" in window)) {
       alert("This browser does not support system notifications");
-    } else {
-      Notification.requestPermission().then((permission) => {
-        if (permission === "granted") {
-          new Notification("Notifications Enabled", { body: "You will now receive low stock alerts." });
-          playAlertSound();
-        }
-      });
+      return;
     }
+
+    if (Notification.permission === 'granted') {
+        alert("Notifications are already active!");
+        playAlertSound();
+        return;
+    }
+
+    if (Notification.permission === 'denied') {
+        alert("Notifications are blocked! Please reset permission in Browser Settings (Lock icon in URL bar).");
+        return;
+    }
+
+    Notification.requestPermission().then((permission) => {
+      setNotifPermission(permission);
+      if (permission === "granted") {
+        new Notification("Success!", { body: "Low stock alerts are now active." });
+        playAlertSound();
+      }
+    });
   };
 
   const playAlertSound = () => {
@@ -333,9 +368,7 @@ export default function ArvindRegister() {
     </div>
   );
 
-  // --- NEW: STOCK SEARCH VIEW ---
   const renderStockSearch = () => {
-      // Logic to find all items matching string
       const filteredStock = data.entries.filter(e => stockSearchTerm && e.car.toLowerCase().includes(stockSearchTerm.toLowerCase()));
       const totalStockCount = filteredStock.reduce((a,b) => a+b.qty, 0);
 
@@ -476,17 +509,37 @@ export default function ArvindRegister() {
             <TranslateBtn />
        </div>
        
+       {/* SMART INSTALL BUTTON */}
        <div className={`p-4 rounded-xl border mb-4 bg-gradient-to-r from-blue-600 to-blue-800 text-white`}>
           <div className="flex justify-between items-center">
-             <div><h3 className="font-bold text-lg">Download App</h3><p className="text-xs opacity-80">Install on Home Screen</p></div>
-             <button onClick={handleInstallClick} className="bg-white text-blue-800 px-4 py-2 rounded-lg font-bold flex items-center gap-2"><Download size={18}/> Install</button>
+             <div>
+                 <h3 className="font-bold text-lg">{t("Install App")}</h3>
+                 <p className="text-xs opacity-80">{deferredPrompt ? "Tap to Install" : "Add to Home Screen"}</p>
+             </div>
+             <button onClick={handleInstallClick} className="bg-white text-blue-800 px-4 py-2 rounded-lg font-bold flex items-center gap-2 active:scale-95 transition-transform">
+                {deferredPrompt ? <Download size={18}/> : <Smartphone size={18}/>}
+                {deferredPrompt ? "Install" : "Guide"}
+             </button>
           </div>
        </div>
 
+       {/* SMART NOTIFICATION BUTTON */}
        <div className={`p-4 rounded-xl border mb-4 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-300'}`}>
           <div className="flex justify-between items-center">
-             <div><h3 className="font-bold">Notifications</h3><p className="text-xs opacity-70">Allow sound & popups</p></div>
-             <button onClick={requestNotificationPermission} className="bg-green-600 text-white px-4 py-2 rounded font-bold flex items-center gap-2"><Bell size={18}/> Enable</button>
+             <div>
+                 <h3 className="font-bold">{t("Notifications")}</h3>
+                 <p className="text-xs opacity-70">{notifPermission === 'granted' ? "Alerts are Active" : "Allow sound & popups"}</p>
+             </div>
+             
+             {notifPermission === 'granted' ? (
+                 <button className="bg-green-100 text-green-700 border border-green-500 px-4 py-2 rounded font-bold flex items-center gap-2 cursor-default">
+                    <CheckCircle size={18}/> Active
+                 </button>
+             ) : (
+                 <button onClick={requestNotificationPermission} className="bg-green-600 text-white px-4 py-2 rounded font-bold flex items-center gap-2 active:scale-95 transition-transform">
+                    <Bell size={18}/> Enable
+                 </button>
+             )}
           </div>
        </div>
 
@@ -533,10 +586,7 @@ export default function ArvindRegister() {
       <div className={`fixed bottom-0 w-full border-t flex justify-between px-2 p-2 pb-safe z-50 ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-300'}`}>
          <NavBtn icon={Book} label={t("Index")} active={view === 'generalIndex'} onClick={() => setView('generalIndex')} isDark={isDark}/>
          <NavBtn icon={Grid} label={t("Pages")} active={view === 'pagesGrid'} onClick={() => { setView('pagesGrid'); setIndexSearchTerm(''); }} isDark={isDark}/>
-         
-         {/* NEW SEARCH BUTTON */}
          <NavBtn icon={Search} label={t("Search")} active={view === 'stockSearch'} onClick={() => { setView('stockSearch'); setStockSearchTerm(''); }} isDark={isDark}/>
-
          <NavBtn icon={AlertTriangle} label={t("Alerts")} active={view === 'alerts'} onClick={() => setView('alerts')} alert={data.entries.some(e => e.qty < data.settings.limit)} isDark={isDark}/>
          <NavBtn icon={Settings} label={t("Settings")} active={view === 'settings'} onClick={() => setView('settings')} isDark={isDark}/>
       </div>
