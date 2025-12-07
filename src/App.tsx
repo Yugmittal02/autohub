@@ -32,6 +32,7 @@ import {
 
 // --- DATA PERSISTENCE HELPERS ---
 const loadFromStorage = (key, initial) => {
+  if (typeof window === 'undefined') return initial;
   const saved = localStorage.getItem(key);
   return saved ? JSON.parse(saved) : initial;
 };
@@ -55,38 +56,77 @@ const initialTransactions = [
   { id: 102, type: 'Restock', productName: 'Car Body Cover', amount: 0, date: 'Yesterday, 6:00 PM' }
 ];
 
-// --- VOICE INPUT COMPONENT ---
+// --- IMPROVED VOICE INPUT COMPONENT ---
 const VoiceInput = ({ onResult, isDark }) => {
   const [isListening, setIsListening] = useState(false);
+  const [error, setError] = useState(null);
 
   const startListening = () => {
+    setError(null);
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       const recognition = new SpeechRecognition();
-      recognition.lang = 'hi-IN'; // Optimized for Hindi/Indian English
-      recognition.continuous = false;
-      recognition.interimResults = false;
+      
+      // Upgrade: Better config for Hindi & Noise
+      recognition.lang = 'hi-IN'; 
+      recognition.continuous = false; // Stops automatically after speaking
+      recognition.interimResults = false; // Waits for final result to reduce noise errors
+      recognition.maxAlternatives = 1;
 
       recognition.onstart = () => setIsListening(true);
-      recognition.onend = () => setIsListening(false);
+      
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognition.onerror = (event) => {
+        console.error("Voice error:", event.error);
+        setIsListening(false);
+        setError("Mic Error");
+        setTimeout(() => setError(null), 2000);
+      };
+
       recognition.onresult = (event) => {
         const transcript = event.results[0][0].transcript;
-        onResult(transcript);
+        if(transcript) {
+            onResult(transcript);
+        }
       };
-      recognition.start();
+      
+      try {
+        recognition.start();
+      } catch (e) {
+        console.error(e);
+      }
     } else {
       alert("Voice search not supported in this browser.");
     }
   };
 
   return (
-    <button
-      onClick={startListening}
-      className={`p-2 rounded-full transition-all ${isListening ? 'animate-pulse bg-red-500 text-white' : (isDark ? 'text-slate-400 hover:text-white' : 'text-slate-400 hover:text-blue-600')}`}
-      title="Speak to Search (Hindi/English)"
-    >
-      <Mic size={20} />
-    </button>
+    <div className="relative">
+        <button
+        onClick={startListening}
+        className={`p-2 rounded-full transition-all duration-200 ${
+            isListening 
+            ? 'bg-red-500 text-white animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.5)]' 
+            : (isDark ? 'text-slate-400 hover:text-white hover:bg-slate-700' : 'text-slate-400 hover:text-blue-600 hover:bg-blue-50')
+        }`}
+        title="Speak (Hindi/English)"
+        >
+        <Mic size={20} />
+        </button>
+        {isListening && (
+            <span className="absolute -top-8 left-1/2 -translate-x-1/2 text-[10px] bg-red-500 text-white px-2 py-0.5 rounded whitespace-nowrap">
+                Sun raha hu...
+            </span>
+        )}
+        {error && (
+             <span className="absolute -top-8 left-1/2 -translate-x-1/2 text-[10px] bg-slate-700 text-white px-2 py-0.5 rounded whitespace-nowrap">
+             Retry
+         </span>
+        )}
+    </div>
   );
 };
 
@@ -98,7 +138,6 @@ const LoginScreen = ({ onLogin }) => {
 
   const handleLogin = (e) => {
     e.preventDefault();
-    // HARDCODED SECURE CREDENTIALS FOR DEMO
     if (username === 'admin' && password === 'password123') {
       onLogin();
     } else {
@@ -108,7 +147,7 @@ const LoginScreen = ({ onLogin }) => {
 
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-      <div className="bg-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-md border border-slate-700">
+      <div className="bg-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-md border border-slate-700 animate-scale-in">
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-blue-600 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-500/20">
              <span className="text-white font-bold text-2xl">AH</span>
@@ -180,12 +219,11 @@ const AIChatBot = ({ products, transactions, isDark, businessName }) => {
     const lowerText = text.toLowerCase();
     let response = "Maaf kijiye, mujhe samajh nahi aaya. Kripya products, stock ya sales ke baare mein puchiye.";
 
-    // Logic to simulate "Knowing the whole business"
-    if (lowerText.includes('total stock') || lowerText.includes('kitne item')) {
+    if (lowerText.includes('total stock') || lowerText.includes('kitne item') || lowerText.includes('kul stock')) {
       const totalStock = products.reduce((acc, p) => acc + p.stock, 0);
       response = `Humare paas kul ${products.length} alag products hain, aur total ${totalStock} units stock mein hain.`;
     } 
-    else if (lowerText.includes('sale') || lowerText.includes('kamai') || lowerText.includes('revenue')) {
+    else if (lowerText.includes('sale') || lowerText.includes('kamai') || lowerText.includes('revenue') || lowerText.includes('bikri')) {
       const totalSales = transactions.filter(t => t.type === 'Sale').reduce((acc, t) => acc + t.amount, 0);
       response = `Aaj ki total sales abhi tak ₹${totalSales.toLocaleString()} hui hai.`;
     }
@@ -194,13 +232,11 @@ const AIChatBot = ({ products, transactions, isDark, businessName }) => {
       response = lowStock ? `Ye items khatam hone wale hain: ${lowStock}` : "Sabhi items ka stock sufficient hai.";
     }
     else {
-      // Product search logic
       const foundProduct = products.find(p => lowerText.includes(p.name.toLowerCase().split(' ')[0].toLowerCase()));
       if (foundProduct) {
         response = `${foundProduct.name} ka price ₹${foundProduct.price} hai aur abhi ${foundProduct.stock} units available hain. Ye ${foundProduct.compatibleCars.join(', ')} ke liye compatible hai.`;
       }
     }
-
     return response;
   };
 
@@ -218,26 +254,32 @@ const AIChatBot = ({ products, transactions, isDark, businessName }) => {
 
   return (
     <>
+      {/* Backdrop for mobile when chat is open to allow click-outside closing */}
+      {isOpen && (
+        <div className="fixed inset-0 bg-transparent z-40 md:hidden" onClick={() => setIsOpen(false)}></div>
+      )}
+
       <button 
         onClick={() => setIsOpen(!isOpen)} 
-        className="fixed bottom-6 right-6 z-50 p-4 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full shadow-2xl text-white hover:scale-105 transition-transform"
+        className="fixed bottom-6 right-6 z-50 p-4 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full shadow-2xl text-white hover:scale-105 transition-transform active:scale-95"
       >
         {isOpen ? <X size={24} /> : <MessageSquare size={24} />}
       </button>
 
       {isOpen && (
-        <div className={`fixed bottom-24 right-6 z-50 w-80 md:w-96 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-scale-in border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`} style={{height: '500px'}}>
-          <div className="p-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white flex justify-between items-center">
+        <div className={`fixed bottom-24 right-6 z-50 w-[90vw] md:w-96 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-scale-in border max-h-[70vh] ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`} style={{height: '500px'}}>
+          <div className="p-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white flex justify-between items-center shrink-0">
              <div>
                <h3 className="font-bold flex items-center gap-2"><div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"/> Business AI</h3>
                <p className="text-xs opacity-80">Hindi & Voice Enabled</p>
              </div>
+             <button onClick={() => setIsOpen(false)} className="md:hidden text-white/80"><X size={20}/></button>
           </div>
           
           <div className={`flex-1 overflow-y-auto p-4 space-y-3 ${isDark ? 'bg-slate-900' : 'bg-slate-50'}`}>
             {messages.map((msg, idx) => (
               <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[80%] p-3 rounded-2xl text-sm ${msg.role === 'user' ? 'bg-indigo-600 text-white rounded-br-none' : (isDark ? 'bg-slate-700 text-slate-200 rounded-bl-none' : 'bg-white border border-slate-200 text-slate-700 rounded-bl-none')}`}>
+                <div className={`max-w-[85%] p-3 rounded-2xl text-sm ${msg.role === 'user' ? 'bg-indigo-600 text-white rounded-br-none' : (isDark ? 'bg-slate-700 text-slate-200 rounded-bl-none' : 'bg-white border border-slate-200 text-slate-700 rounded-bl-none')}`}>
                   {msg.text}
                 </div>
               </div>
@@ -245,14 +287,14 @@ const AIChatBot = ({ products, transactions, isDark, businessName }) => {
             <div ref={messagesEndRef} />
           </div>
 
-          <div className={`p-3 border-t flex items-center gap-2 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+          <div className={`p-3 border-t flex items-center gap-2 shrink-0 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
             <VoiceInput onResult={setQuery} isDark={isDark} />
             <input 
               type="text" 
               value={query} 
               onChange={e => setQuery(e.target.value)}
               onKeyPress={e => e.key === 'Enter' && handleSend()}
-              placeholder="Ask AI (e.g., Stock check)..."
+              placeholder="Ask AI..."
               className={`flex-1 bg-transparent border-none outline-none text-sm ${isDark ? 'text-white placeholder-slate-500' : 'text-slate-800'}`}
             />
             <button onClick={handleSend} className="text-indigo-500 hover:text-indigo-600 p-2"><Send size={20}/></button>
@@ -294,7 +336,7 @@ const StatCard = ({ title, value, icon: Icon, color, subtext, onClick, clickable
       onClick={onClick}
       className={`p-5 rounded-lg border shadow-sm flex items-start justify-between relative overflow-hidden group transition-all
         ${isDark ? 'bg-slate-800 border-slate-700 hover:border-blue-500' : 'bg-white border-slate-200 hover:border-blue-400'}
-        ${clickable ? 'cursor-pointer hover:shadow-md' : ''}`}
+        ${clickable ? 'cursor-pointer hover:shadow-md active:scale-98' : ''}`}
     >
       <div className="z-10">
         <p className={`text-xs font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{title}</p>
@@ -312,8 +354,12 @@ const StatCard = ({ title, value, icon: Icon, color, subtext, onClick, clickable
 const ProductDetailModal = ({ product, onClose, onStockChange, isDark }) => {
   if (!product) return null;
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm animate-fade-in p-4">
-      <div className={`rounded-lg shadow-2xl w-full max-w-lg overflow-hidden border animate-scale-in flex flex-col max-h-[90vh] ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+    // Backdrop with click-to-close
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm animate-fade-in p-4" onClick={onClose}>
+      <div 
+        className={`rounded-lg shadow-2xl w-full max-w-lg overflow-hidden border animate-scale-in flex flex-col max-h-[90vh] ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}
+        onClick={(e) => e.stopPropagation()} // Prevent close when clicking inside modal
+      >
         <div className={`px-6 py-4 border-b flex justify-between items-center ${isDark ? 'bg-slate-900/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
           <div>
             <h3 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{product.name}</h3>
@@ -541,8 +587,8 @@ export default function ERPSystem() {
            </div>
 
            <div className={`rounded-lg shadow-sm border flex-1 overflow-hidden flex flex-col ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-             <div className="overflow-auto flex-1">
-               <table className="w-full text-left text-sm">
+             <div className="overflow-x-auto flex-1">
+               <table className="w-full text-left text-sm min-w-[500px]">
                  <thead className={`font-semibold sticky top-0 z-10 border-b ${isDark ? 'bg-slate-900 text-slate-400 border-slate-700' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
                    <tr>
                      <th className="px-6 py-3">Time</th>
@@ -574,7 +620,7 @@ export default function ERPSystem() {
 
     return (
       <div className="space-y-6 animate-fade-in pb-10">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
           <StatCard
             isDark={isDark}
             title="Total Inventory"
@@ -607,8 +653,8 @@ export default function ERPSystem() {
           />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[400px]">
-          <div className={`rounded-lg shadow-sm border flex flex-col overflow-hidden ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:h-[400px]">
+          <div className={`rounded-lg shadow-sm border flex flex-col overflow-hidden h-[300px] md:h-full ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
             <div className={`p-3 border-b flex items-center justify-between ${isDark ? 'border-slate-700 bg-slate-900/30' : 'border-slate-200 bg-slate-50'}`}>
               <h3 className={`font-bold text-sm uppercase tracking-wide flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
                 <FileText size={16} /> System Notes
@@ -623,7 +669,7 @@ export default function ERPSystem() {
             />
           </div>
 
-          <div className={`rounded-lg shadow-sm border flex flex-col overflow-hidden ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+          <div className={`rounded-lg shadow-sm border flex flex-col overflow-hidden h-[300px] md:h-full ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
             <div className={`p-3 border-b flex justify-between items-center ${isDark ? 'border-slate-700 bg-slate-900/30' : 'border-slate-200 bg-slate-50'}`}>
               <h3 className={`font-bold text-sm uppercase tracking-wide ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Live Feed</h3>
               <button onClick={() => setDashboardView('transactions')} className="text-xs text-blue-600 hover:underline font-medium">Full History</button>
@@ -636,7 +682,7 @@ export default function ERPSystem() {
                       {t.type === 'Sale' ? <DollarSign size={14}/> : <Plus size={14}/>}
                     </div>
                     <div>
-                      <p className={`text-sm font-semibold truncate max-w-[150px] ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{t.productName}</p>
+                      <p className={`text-sm font-semibold truncate max-w-[120px] sm:max-w-[150px] ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{t.productName}</p>
                       <p className="text-[10px] text-slate-400 font-mono">{t.date}</p>
                     </div>
                   </div>
@@ -710,7 +756,7 @@ export default function ERPSystem() {
            </div>
         </div>
 
-        <div className={`md:hidden w-full p-2 border-b ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+        <div className={`md:hidden w-full p-2 border-b shrink-0 ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
           <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className={`w-full p-2 border rounded text-sm ${isDark ? 'bg-slate-800 border-slate-600 text-white' : 'bg-white border-slate-300'}`}>
             {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
           </select>
@@ -722,15 +768,15 @@ export default function ERPSystem() {
               <Folder size={16} className="text-blue-500"/>
               {selectedCategory}
             </h3>
-            <span className="text-xs text-slate-400 font-mono">{filteredProducts.length} records found</span>
+            <span className="text-xs text-slate-400 font-mono">{filteredProducts.length} records</span>
           </div>
 
-          <div className="overflow-auto flex-1">
-            <table className="w-full text-left border-collapse">
+          <div className="overflow-x-auto flex-1">
+            <table className="w-full text-left border-collapse min-w-[600px] md:min-w-0">
               <thead className={`text-[11px] uppercase font-bold tracking-wider sticky top-0 z-10 border-b shadow-sm ${isDark ? 'bg-slate-900 text-slate-400 border-slate-700' : 'bg-slate-50 text-slate-600 border-slate-200'}`}>
                 <tr>
                   <th className="px-4 py-3">Product Name</th>
-                  <th className="px-4 py-3 text-right hidden sm:table-cell">Price</th>
+                  <th className="px-4 py-3 text-right">Price</th>
                   <th className="px-4 py-3 text-center">Status</th>
                   <th className="px-4 py-3 text-center">Stock Control</th>
                 </tr>
@@ -740,9 +786,8 @@ export default function ERPSystem() {
                   <tr key={product.id} className={`transition-colors group ${isDark ? 'hover:bg-slate-700/50' : 'hover:bg-blue-50/30'}`}>
                     <td className="px-4 py-2.5">
                       <div className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{product.name}</div>
-                      <div className="text-[10px] text-slate-400 mt-0.5 sm:hidden">₹{product.price}</div>
                     </td>
-                    <td className="px-4 py-2.5 text-right font-mono text-slate-500 hidden sm:table-cell">₹{product.price.toLocaleString()}</td>
+                    <td className="px-4 py-2.5 text-right font-mono text-slate-500">₹{product.price.toLocaleString()}</td>
                     <td className="px-4 py-2.5 text-center">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${
                         product.stock < lowStockThreshold
@@ -753,7 +798,7 @@ export default function ERPSystem() {
                       </span>
                     </td>
                     <td className="px-4 py-2.5">
-                      <div className="flex items-center justify-center space-x-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center justify-center space-x-1 opacity-80 group-hover:opacity-100 transition-opacity">
                         <button
                            onClick={() => handleStockChange(product.id, -1)}
                            className={`w-7 h-7 flex items-center justify-center rounded border transition-colors ${isDark ? 'bg-slate-800 border-slate-600 text-red-400 hover:bg-slate-700' : 'bg-white border-slate-200 text-red-600 hover:bg-red-50 hover:border-red-200'}`}
@@ -796,7 +841,7 @@ export default function ERPSystem() {
     if (selectedCarCategory) {
       const categoryProducts = carMatchCategories[selectedCarCategory] || [];
       return (
-        <div className="max-w-5xl mx-auto animate-fade-in p-6 h-full overflow-auto">
+        <div className="max-w-5xl mx-auto animate-fade-in p-6 h-full overflow-y-auto">
           <button
             onClick={() => setSelectedCarCategory(null)}
             className="mb-6 flex items-center text-slate-500 hover:text-blue-600 transition-colors font-medium"
@@ -813,19 +858,19 @@ export default function ERPSystem() {
             </div>
             <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {categoryProducts.map(product => (
-                 <div key={product.id} 
-                      onClick={() => setSelectedProductForDetail(product)}
-                      className={`border p-4 rounded-lg hover:shadow-md transition-all cursor-pointer group relative ${isDark ? 'bg-slate-800 border-slate-700 hover:border-blue-500' : 'bg-white border-slate-200 hover:border-blue-300'}`}
-                 >
-                    <div className="flex justify-between items-start mb-2">
-                      <h4 className={`font-bold line-clamp-2 text-sm group-hover:text-blue-600 ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{product.name}</h4>
-                      <div className={`w-2 h-2 rounded-full shrink-0 mt-1.5 ${product.stock > 0 ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
-                    </div>
-                    <div className="flex justify-between items-end mt-4">
-                      <p className={`text-lg font-bold font-mono ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>₹{product.price}</p>
-                      <span className="text-[10px] text-blue-500 font-medium opacity-0 group-hover:opacity-100 transition-opacity">VIEW DETAILS</span>
-                    </div>
-                 </div>
+                  <div key={product.id} 
+                       onClick={() => setSelectedProductForDetail(product)}
+                       className={`border p-4 rounded-lg hover:shadow-md transition-all cursor-pointer group relative ${isDark ? 'bg-slate-800 border-slate-700 hover:border-blue-500' : 'bg-white border-slate-200 hover:border-blue-300'}`}
+                  >
+                     <div className="flex justify-between items-start mb-2">
+                       <h4 className={`font-bold line-clamp-2 text-sm group-hover:text-blue-600 ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{product.name}</h4>
+                       <div className={`w-2 h-2 rounded-full shrink-0 mt-1.5 ${product.stock > 0 ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
+                     </div>
+                     <div className="flex justify-between items-end mt-4">
+                       <p className={`text-lg font-bold font-mono ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>₹{product.price}</p>
+                       <span className="text-[10px] text-blue-500 font-medium opacity-0 group-hover:opacity-100 transition-opacity">VIEW DETAILS</span>
+                     </div>
+                  </div>
               ))}
             </div>
           </div>
@@ -834,7 +879,7 @@ export default function ERPSystem() {
     }
 
     return (
-      <div className="flex items-center justify-center h-full p-6 animate-fade-in">
+      <div className="flex items-center justify-center h-full p-6 animate-fade-in overflow-y-auto">
         <div className="w-full max-w-2xl text-center space-y-8">
           <div className={`inline-block p-6 rounded-full mb-4 border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-blue-50 border-blue-100'}`}>
             <Car className={`w-12 h-12 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
@@ -843,26 +888,26 @@ export default function ERPSystem() {
           <p className="text-slate-500 max-w-md mx-auto">Enter a vehicle model to instantly filter the entire database for compatible parts.</p>
 
           <div className="relative max-w-lg mx-auto group">
-             <div className="flex gap-2">
-                 <div className="relative flex-1">
-                     <input
-                       type="text"
-                       className={`block w-full pl-6 pr-14 py-4 border rounded-lg text-lg shadow-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all ${isDark ? 'bg-slate-800 border-slate-600 text-white placeholder-slate-500' : 'bg-white border-slate-300'}`}
-                       placeholder="e.g. Swift, Thar, Creta..."
-                       value={carModelSearch}
-                       onChange={(e) => {
-                         setCarModelSearch(e.target.value);
-                         setSelectedCarCategory(null);
-                       }}
-                     />
-                     <div className="absolute right-3 top-1/2 -translate-y-1/2 bg-slate-900 p-2 rounded-md text-white shadow-md group-focus-within:bg-blue-600 transition-colors">
-                       <Search size={20} />
-                     </div>
-                 </div>
-                 <div className="flex items-center justify-center">
-                    <VoiceInput onResult={setCarModelSearch} isDark={isDark} />
-                 </div>
-             </div>
+              <div className="flex gap-2">
+                  <div className="relative flex-1">
+                      <input
+                        type="text"
+                        className={`block w-full pl-6 pr-14 py-4 border rounded-lg text-lg shadow-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all ${isDark ? 'bg-slate-800 border-slate-600 text-white placeholder-slate-500' : 'bg-white border-slate-300'}`}
+                        placeholder="e.g. Swift, Thar, Creta..."
+                        value={carModelSearch}
+                        onChange={(e) => {
+                          setCarModelSearch(e.target.value);
+                          setSelectedCarCategory(null);
+                        }}
+                      />
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 bg-slate-900 p-2 rounded-md text-white shadow-md group-focus-within:bg-blue-600 transition-colors">
+                        <Search size={20} />
+                      </div>
+                  </div>
+                  <div className="flex items-center justify-center">
+                     <VoiceInput onResult={setCarModelSearch} isDark={isDark} />
+                  </div>
+              </div>
           </div>
 
           {carModelSearch.length > 2 && Object.keys(carMatchCategories).length > 0 && (
@@ -887,10 +932,10 @@ export default function ERPSystem() {
   };
 
   const renderSettings = () => (
-    <div className="animate-fade-in space-y-6 pb-10 max-w-4xl mx-auto">
+    <div className="animate-fade-in space-y-6 pb-10 max-w-4xl mx-auto overflow-y-auto h-full px-2">
       <div className="flex items-center justify-between mb-8">
         <h1 className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>Settings</h1>
-        <span className={`text-sm px-4 py-2 rounded-full ${isDark ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>System Configuration</span>
+        <span className={`text-sm px-4 py-2 rounded-full hidden sm:inline-block ${isDark ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>System Configuration</span>
       </div>
 
       <div className={`rounded-lg shadow-sm border p-6 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
@@ -1029,6 +1074,14 @@ export default function ERPSystem() {
 
   return (
     <div className={`flex h-screen font-sans overflow-hidden ${isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
+      {/* Mobile Backdrop for clicking outside to close menu */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-30 md:hidden glass-effect" 
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
       <aside
         className={`flex flex-col transition-all duration-300 z-40 shrink-0 ${isDark ? 'bg-slate-900 border-r border-slate-800' : 'bg-slate-900 text-slate-300'}
           ${isMobileMenuOpen ? 'absolute inset-y-0 left-0 w-64 shadow-2xl' : 'relative hidden md:flex'}
@@ -1061,8 +1114,8 @@ export default function ERPSystem() {
 
         <div className="p-4 border-t border-slate-800 shrink-0">
            <button onClick={handleLogout} className={`flex items-center w-full text-slate-400 hover:text-white transition-colors ${isSidebarCollapsed ? 'justify-center' : 'space-x-3 px-2'}`}>
-              <LogOut size={20} />
-              {!isSidebarCollapsed && <span className="text-sm font-medium">Sign Out</span>}
+             <LogOut size={20} />
+             {!isSidebarCollapsed && <span className="text-sm font-medium">Sign Out</span>}
            </button>
         </div>
       </aside>
@@ -1085,13 +1138,16 @@ export default function ERPSystem() {
               </div>
 
               <div className="relative">
-                  <button
+                  <button 
                     onClick={() => setShowNotifications(!showNotifications)}
                     className={`p-2 relative rounded-full transition-colors ${isDark ? 'hover:bg-slate-800 text-slate-400 hover:text-white' : 'hover:bg-slate-100 text-slate-500 hover:text-slate-800'}`}
                   >
                     <Bell size={20} />
                     {lowStockItems.length > 0 && <span className="absolute top-1.5 right-2 h-2 w-2 bg-red-500 rounded-full border border-white"></span>}
                   </button>
+
+                  {/* Backdrop for notifications */}
+                  {showNotifications && <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)}></div>}
 
                   {showNotifications && (
                     <div className={`absolute right-0 mt-2 w-80 rounded-lg shadow-xl border z-50 overflow-hidden animate-scale-in origin-top-right ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
@@ -1120,7 +1176,7 @@ export default function ERPSystem() {
           </div>
         </header>
 
-        <div className={`flex-1 overflow-y-auto p-6 scroll-smooth ${isDark ? 'bg-slate-950' : 'bg-slate-50/50'}`}>
+        <div className={`flex-1 overflow-y-auto p-2 sm:p-6 scroll-smooth ${isDark ? 'bg-slate-950' : 'bg-slate-50/50'}`}>
           {activeTab === 'dashboard' && renderDashboard()}
           {activeTab === 'inventory' && renderInventory()}
           {activeTab === 'related' && renderCarSearch()}
@@ -1131,16 +1187,16 @@ export default function ERPSystem() {
       {/* Floating AI Assistant */}
       <AIChatBot products={products} transactions={transactions} isDark={isDark} businessName={businessName} />
 
-      <ProductDetailModal
-         product={selectedProductForDetail}
-         onClose={() => setSelectedProductForDetail(null)}
+      <ProductDetailModal 
+         product={selectedProductForDetail} 
+         onClose={() => setSelectedProductForDetail(null)} 
          onStockChange={handleStockChange}
          isDark={isDark}
       />
 
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
-          <div className={`rounded-lg shadow-2xl w-full max-w-md overflow-hidden animate-scale-in ${isDark ? 'bg-slate-800' : 'bg-white'}`}>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm" onClick={() => setIsAddModalOpen(false)}>
+          <div className={`rounded-lg shadow-2xl w-full max-w-md overflow-hidden animate-scale-in ${isDark ? 'bg-slate-800' : 'bg-white'}`} onClick={e => e.stopPropagation()}>
             <div className={`p-4 border-b flex justify-between items-center ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
               <h3 className={`font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>New Product Entry</h3>
               <button onClick={() => setIsAddModalOpen(false)}><X size={20} className="text-slate-400 hover:text-slate-700"/></button>
@@ -1178,8 +1234,8 @@ export default function ERPSystem() {
       )}
 
       {isCategoryModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
-          <div className={`rounded-lg shadow-xl w-full max-w-sm overflow-hidden animate-scale-in ${isDark ? 'bg-slate-800' : 'bg-white'}`}>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm" onClick={() => setIsCategoryModalOpen(false)}>
+          <div className={`rounded-lg shadow-xl w-full max-w-sm overflow-hidden animate-scale-in ${isDark ? 'bg-slate-800' : 'bg-white'}`} onClick={e => e.stopPropagation()}>
             <div className={`p-4 border-b flex justify-between items-center ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
               <h3 className={`font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>Add Category</h3>
               <button onClick={() => setIsCategoryModalOpen(false)}><X size={20} className="text-slate-400 hover:text-slate-700"/></button>
