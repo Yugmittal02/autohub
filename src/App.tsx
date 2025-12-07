@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Plus, Minus, Search, X, Trash2, ArrowLeft, Book, Car, 
   ChevronRight, Mic, Settings, AlertTriangle, Languages, 
-  Lock, Bell, Volume2, Save, LogOut, Grid, Download, ShieldCheck
+  Lock, Bell, Volume2, Save, LogOut, Grid, Download, ShieldCheck, ShieldAlert
 } from 'lucide-react';
 
 // --- DICTIONARY FOR TRANSLATION ---
@@ -18,7 +18,8 @@ const dictionary = {
   "universal": "यूनिवर्सल", "page": "पेज", "qty": "मात्रा", "car": "गाड़ी",
   "search": "खोजें", "index": "विषय सूची", "settings": "सेटिंग्स",
   "pages": "पेज लिस्ट", "arvind index": "अरविन्द इंडेक्स",
-  "total": "कुल", "delete": "हटाएं", "confirm": "पुष्टि करें"
+  "total": "कुल", "delete": "हटाएं", "confirm": "पुष्टि करें",
+  "found in": "में मिला", "items": "सामान", "safe mode": "सुरक्षा मोड"
 };
 
 const translateText = (text) => {
@@ -65,12 +66,12 @@ export default function ArvindRegister() {
   const [indexSearchTerm, setIndexSearchTerm] = useState(''); 
   const [isHindi, setIsHindi] = useState(false);
   
-  // --- NEW: App Lock State ---
+  // --- NEW: Safe Mode State (Double Check) ---
+  const [isSafeMode, setIsSafeMode] = useState(true); // Default ON for safety
+
   const [isAppUnlocked, setIsAppUnlocked] = useState(false); 
   const [loginPassInput, setLoginPassInput] = useState('');
   
-  const [passInput, setPassInput] = useState('');
-  const [showPassModal, setShowPassModal] = useState(false);
   const [newPass, setNewPass] = useState('');
   const [isNewPageOpen, setIsNewPageOpen] = useState(false);
   const [isNewEntryOpen, setIsNewEntryOpen] = useState(false);
@@ -100,7 +101,6 @@ export default function ArvindRegister() {
     }
   };
 
-  // --- NOTIFICATION & SOUND LOGIC ---
   const requestNotificationPermission = () => {
     if (!("Notification" in window)) {
       alert("This browser does not support system notifications");
@@ -130,7 +130,6 @@ export default function ArvindRegister() {
   const isDark = data.settings.theme === 'dark';
   const t = (txt) => isHindi ? translateText(txt) : txt;
 
-  // --- APP UNLOCK HANDLER ---
   const handleAppUnlock = () => {
     if (loginPassInput === data.settings.password) {
         setIsAppUnlocked(true);
@@ -141,9 +140,8 @@ export default function ArvindRegister() {
     }
   };
 
-  // --- NEW: DELETE LOGIC WITH DOUBLE PERMISSION ---
   const handleDeletePage = (e, pageId) => {
-    e.stopPropagation(); // Stop click from opening the page
+    e.stopPropagation(); 
     if (window.confirm(t("Delete this page?"))) {
         if (window.confirm(t("Double Check: This will delete ALL items in this page permanently. Are you sure?"))) {
             const updatedPages = data.pages.filter(p => p.id !== pageId);
@@ -179,7 +177,14 @@ export default function ArvindRegister() {
     setIsNewEntryOpen(false);
   };
 
+  // --- MODIFIED QTY UPDATE FOR SAFE MODE ---
   const updateQty = (id, amount) => {
+    // Safety Check
+    if (isSafeMode) {
+        const action = amount > 0 ? "Add" : "Reduce";
+        if (!window.confirm(`${t(action)} 1 Qty?`)) return;
+    }
+
     const updatedEntries = data.entries.map(e => {
       if (e.id === id) {
         const newQty = Math.max(0, e.qty + amount);
@@ -193,19 +198,36 @@ export default function ArvindRegister() {
     setData({ ...data, entries: updatedEntries });
   };
 
-  const filteredPages = useMemo(() => {
-    if (!indexSearchTerm) return data.pages;
-    return data.pages.filter(p => p.itemName.toLowerCase().includes(indexSearchTerm.toLowerCase()));
-  }, [data.pages, indexSearchTerm]);
+  // --- NEW: GLOBAL SEARCH LOGIC (Deep Search) ---
+  const globalSearchResults = useMemo(() => {
+    if (!indexSearchTerm) return { pages: data.pages, items: [] };
+    
+    // 1. Filter Pages normally
+    const filteredPages = data.pages.filter(p => p.itemName.toLowerCase().includes(indexSearchTerm.toLowerCase()));
+    
+    // 2. Filter Items across ALL pages
+    const filteredItems = data.entries.filter(e => e.car.toLowerCase().includes(indexSearchTerm.toLowerCase()));
+    
+    // Group items by their page for display
+    const itemsGrouped = filteredItems.reduce((acc, item) => {
+        const p = data.pages.find(page => page.id === item.pageId);
+        if (p) {
+            if (!acc[p.itemName]) acc[p.itemName] = [];
+            acc[p.itemName].push(item);
+        }
+        return acc;
+    }, {});
 
-  // --- HELPER: Common Header Button for Translation ---
+    return { pages: filteredPages, items: itemsGrouped };
+  }, [data.pages, data.entries, indexSearchTerm]);
+
+
   const TranslateBtn = () => (
     <button onClick={() => setIsHindi(!isHindi)} className={`p-2 rounded-full border ${isDark ? 'bg-slate-700 border-slate-500' : 'bg-white/50 border-black/10'}`}>
       <Languages size={20}/>
     </button>
   );
 
-  // --- RENDER LOCK SCREEN ---
   if (!isAppUnlocked) {
     return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 p-6 text-white">
@@ -214,29 +236,16 @@ export default function ArvindRegister() {
                     <Lock size={40} />
                 </div>
                 <h1 className="text-3xl font-bold mb-2">Arvind Register</h1>
-                <p className="text-slate-400 mb-8">Enter password to access</p>
-                
-                <input 
-                    type="password" 
-                    placeholder="Password"
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl p-4 text-center text-2xl tracking-widest outline-none focus:border-blue-500 mb-4 transition-all"
-                    value={loginPassInput}
-                    onChange={(e) => setLoginPassInput(e.target.value)}
-                />
-                
-                <button 
-                    onClick={handleAppUnlock}
-                    className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl text-lg transition-all active:scale-95"
-                >
-                    UNLOCK APP
-                </button>
+                <input type="password" placeholder="Password" className="w-full bg-slate-800 border border-slate-700 rounded-xl p-4 text-center text-2xl tracking-widest outline-none focus:border-blue-500 mb-4 transition-all" value={loginPassInput} onChange={(e) => setLoginPassInput(e.target.value)}/>
+                <button onClick={handleAppUnlock} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl text-lg transition-all active:scale-95">UNLOCK APP</button>
                 <p className="mt-6 text-xs text-slate-600">Default Password: 123</p>
             </div>
         </div>
     );
   }
 
-  // --- COMPONENT VIEWS ---
+  // --- RENDER FUNCTIONS ---
+  
   const renderGeneralIndex = () => (
     <div className="pb-24">
       <div className={`p-6 border-b-4 border-double sticky top-0 z-10 ${isDark ? 'bg-slate-800 border-slate-600' : 'bg-yellow-100 border-yellow-400'}`}>
@@ -244,14 +253,13 @@ export default function ArvindRegister() {
           <h1 className={`text-2xl font-extrabold uppercase tracking-widest ${isDark ? 'text-white' : 'text-yellow-900'} underline decoration-2 decoration-red-400`}>
             {t("Arvind Index")}
           </h1>
-          {/* Translation Toggle Here */}
           <TranslateBtn />
         </div>
         <div className="flex gap-2 mt-3">
             <div className="relative flex-1">
                 <input 
                   className={`w-full pl-9 p-2 rounded border outline-none ${isDark ? 'bg-slate-900 border-slate-600 text-white' : 'bg-white border-yellow-500 text-black'}`}
-                  placeholder={t("Search Index...")}
+                  placeholder={t("Search Index or Item...")}
                   value={indexSearchTerm}
                   onChange={e => setIndexSearchTerm(e.target.value)}
                 />
@@ -263,14 +271,16 @@ export default function ArvindRegister() {
       </div>
 
       <div className={`m-2 border-2 ${isDark ? 'border-slate-700 bg-slate-900' : 'border-black bg-white'}`}>
+        {/* --- SECTION 1: MATCHING PAGES --- */}
         <div className={`flex border-b-2 ${isDark ? 'border-slate-700 bg-slate-800' : 'border-black bg-gray-100'} p-2`}>
           <div className="w-12 font-bold text-center border-r border-gray-400">No.</div>
           <div className="flex-1 font-bold pl-3 border-r border-gray-400">{t("Particulars")}</div>
           <div className="w-16 font-bold text-center border-r border-gray-400">{t("Page")}</div>
           <div className="w-10 font-bold text-center">Del</div>
         </div>
-        <div className="min-h-[60vh]">
-          {filteredPages.map((page, idx) => (
+        
+        <div className="min-h-[20vh]">
+          {globalSearchResults.pages.map((page, idx) => (
             <div 
               key={page.id}
               onClick={() => { setActivePage(page); setView('page'); setPageSearchTerm(''); }}
@@ -279,20 +289,43 @@ export default function ArvindRegister() {
               <div className="w-12 text-center font-bold text-red-600 border-r border-gray-300 h-full flex items-center justify-center text-sm">{idx + 1}</div>
               <div className="flex-1 pl-3 font-semibold text-lg border-r border-gray-300 h-full flex items-center truncate">{t(page.itemName)}</div>
               <div className="w-16 text-center font-bold text-blue-700 h-full flex items-center justify-center underline border-r border-gray-300">{page.pageNo}</div>
-              
-              {/* DELETE BUTTON IN INDEX */}
               <div className="w-10 flex items-center justify-center h-full">
-                <button 
-                    onClick={(e) => handleDeletePage(e, page.id)}
-                    className="p-2 text-red-400 hover:text-red-600 hover:bg-red-100 rounded-full"
-                >
-                    <Trash2 size={16} />
-                </button>
+                <button onClick={(e) => handleDeletePage(e, page.id)} className="p-2 text-red-400 hover:text-red-600 hover:bg-red-100 rounded-full"><Trash2 size={16} /></button>
               </div>
             </div>
           ))}
-          {filteredPages.length === 0 && <div className="p-4 text-center text-gray-400">Not Found</div>}
+          {globalSearchResults.pages.length === 0 && <div className="p-2 text-center text-gray-400 text-sm">No Pages Found</div>}
         </div>
+
+        {/* --- SECTION 2: MATCHING ITEMS (DEEP SEARCH) --- */}
+        {indexSearchTerm && Object.keys(globalSearchResults.items).length > 0 && (
+            <div className={`border-t-4 border-double ${isDark ? 'border-slate-600' : 'border-black'}`}>
+                <div className={`p-2 font-bold text-center uppercase tracking-widest ${isDark ? 'bg-slate-800 text-yellow-400' : 'bg-yellow-200 text-black'}`}>
+                    {t("Found In Items")}
+                </div>
+                {Object.entries(globalSearchResults.items).map(([pageName, items]) => {
+                    // Find the page object to navigate to it
+                    const targetPage = data.pages.find(p => p.itemName === pageName);
+                    return (
+                        <div key={pageName} className="border-b border-gray-300">
+                             <div 
+                                onClick={() => { if(targetPage) { setActivePage(targetPage); setView('page'); setPageSearchTerm(indexSearchTerm); } }}
+                                className={`p-2 font-bold text-sm cursor-pointer hover:underline flex items-center gap-2 ${isDark ? 'bg-slate-800 text-blue-300' : 'bg-gray-100 text-blue-800'}`}
+                             >
+                                <Book size={14}/> {t("Found in")} Page: {t(pageName)} <ChevronRight size={14}/>
+                             </div>
+                             {items.map(item => (
+                                 <div key={item.id} className={`pl-8 pr-4 py-2 flex justify-between border-t border-gray-100 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+                                    <span>{t(item.car)}</span>
+                                    <span className="font-bold">{item.qty}</span>
+                                 </div>
+                             ))}
+                        </div>
+                    )
+                })}
+            </div>
+        )}
+
       </div>
 
       <button onClick={() => setIsNewPageOpen(true)} className="fixed bottom-24 right-6 bg-yellow-500 text-black w-16 h-16 rounded-full shadow-xl border-4 border-white flex items-center justify-center active:scale-95 z-20">
@@ -307,7 +340,6 @@ export default function ArvindRegister() {
             <h1 className={`text-2xl font-bold flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-800'}`}>
                 <Grid/> {t("All Pages")}
             </h1>
-            {/* Translation Toggle Here */}
             <TranslateBtn />
         </div>
         <div className="flex gap-2 mb-4">
@@ -318,14 +350,13 @@ export default function ArvindRegister() {
             <VoiceInput onResult={setIndexSearchTerm} isDark={isDark} />
         </div>
         <div className="grid grid-cols-2 gap-3">
-            {filteredPages.map(page => {
+            {globalSearchResults.pages.map(page => {
                  const totalItems = data.entries.filter(e => e.pageId === page.id).reduce((a,b)=>a+b.qty,0);
                  return (
                     <div key={page.id} onClick={() => { setActivePage(page); setView('page'); setPageSearchTerm(''); }} className={`relative p-4 rounded-xl border-2 shadow-sm cursor-pointer active:scale-95 transition-all flex flex-col justify-between h-36 ${isDark ? 'bg-slate-800 border-slate-600 hover:border-blue-500' : 'bg-white border-gray-200 hover:border-blue-500'}`}>
                         <div>
                             <div className="flex justify-between items-start">
                                 <span className="text-xs font-bold px-2 py-1 rounded bg-gray-200 text-gray-800">Pg {page.pageNo}</span>
-                                {/* DELETE BUTTON IN GRID */}
                                 <button onClick={(e) => handleDeletePage(e, page.id)} className="p-1 text-red-300 hover:text-red-600 hover:bg-red-50 rounded"><Trash2 size={16}/></button>
                             </div>
                             <h3 className={`font-bold text-lg mt-2 leading-tight ${isDark ? 'text-white' : 'text-gray-800'}`}>{t(page.itemName)}</h3>
@@ -344,8 +375,6 @@ export default function ArvindRegister() {
   const renderPage = () => {
     const pageEntries = data.entries.filter(e => e.pageId === activePage.id);
     const filtered = pageEntries.filter(e => e.car.toLowerCase().includes(pageSearchTerm.toLowerCase()));
-    
-    // --- NEW: Calculate Total Quantity for the whole page ---
     const grandTotal = pageEntries.reduce((acc, curr) => acc + curr.qty, 0);
 
     return (
@@ -356,15 +385,16 @@ export default function ArvindRegister() {
               <div className="flex-1">
                  <div className="flex justify-between items-start">
                     <p className={`text-xs font-bold uppercase ${isDark ? 'text-slate-400' : 'text-red-400'}`}>{t("Page No")}: {activePage.pageNo}</p>
-                    {/* Translation Toggle Here */}
-                    <TranslateBtn />
+                    <div className="flex gap-2">
+                        {/* SAFE MODE TOGGLE */}
+                        <button onClick={() => setIsSafeMode(!isSafeMode)} className={`p-1 rounded-full border ${isSafeMode ? 'bg-green-100 text-green-700 border-green-500' : 'bg-gray-200 text-gray-400'}`}>
+                            {isSafeMode ? <ShieldCheck size={20} /> : <ShieldAlert size={20} />}
+                        </button>
+                        <TranslateBtn />
+                    </div>
                  </div>
                  <h2 className="text-2xl font-black uppercase">{t(activePage.itemName)}</h2>
-                 
-                 {/* SHOW GRAND TOTAL HERE */}
-                 <div className="text-xs font-bold opacity-70 mt-1">
-                    {t("Total")} {t("Items")}: {grandTotal}
-                 </div>
+                 <div className="text-xs font-bold opacity-70 mt-1">{t("Total")} {t("Items")}: {grandTotal}</div>
               </div>
            </div>
            <div className={`p-2 flex gap-2 border-t ${isDark ? 'border-slate-700' : 'border-gray-100'}`}>
@@ -422,7 +452,6 @@ export default function ArvindRegister() {
             <TranslateBtn />
        </div>
        
-       {/* App Install Button */}
        <div className={`p-4 rounded-xl border mb-4 bg-gradient-to-r from-blue-600 to-blue-800 text-white`}>
           <div className="flex justify-between items-center">
              <div><h3 className="font-bold text-lg">Download App</h3><p className="text-xs opacity-80">Install on Home Screen</p></div>
@@ -430,7 +459,6 @@ export default function ArvindRegister() {
           </div>
        </div>
 
-       {/* Notification Permission Button */}
        <div className={`p-4 rounded-xl border mb-4 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-300'}`}>
           <div className="flex justify-between items-center">
              <div><h3 className="font-bold">Notifications</h3><p className="text-xs opacity-70">Allow sound & popups</p></div>
@@ -507,11 +535,14 @@ export default function ArvindRegister() {
             <p className="text-sm font-bold opacity-50 mb-4 text-black">{activePage?.itemName}</p>
             <div className="space-y-4">
               <div className="flex gap-2">
-                 <input autoFocus className="flex-1 border-2 border-black rounded p-3 text-lg font-bold text-black" placeholder="Car Name" value={input.carName} onChange={e => setInput({...input, carName: e.target.value})} />
+                 {/* SHARED STOCK INSTRUCTION */}
+                 <div className="flex-1">
+                     <input autoFocus className="w-full border-2 border-black rounded p-3 text-lg font-bold text-black" placeholder="Car (e.g. Swift & Alto)" value={input.carName} onChange={e => setInput({...input, carName: e.target.value})} />
+                     <p className="text-[10px] text-gray-500 mt-1">Tip: Use "Swift & Alto" for shared items.</p>
+                 </div>
                  <VoiceInput onResult={(txt) => setInput(prev => ({...prev, carName: txt}))} isDark={false} />
               </div>
               
-              {/* NEW: SHOW EXISTING STOCK IF AVAILABLE */}
               {input.carName && (() => {
                 const existing = data.entries
                    .filter(e => e.pageId === activePage.id && e.car.toLowerCase().includes(input.carName.toLowerCase()))
