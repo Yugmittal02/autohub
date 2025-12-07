@@ -17,7 +17,8 @@ const dictionary = {
   "swift": "स्विफ्ट", "thar": "थार", "creta": "क्रेटा", "alto": "आल्टो",
   "universal": "यूनिवर्सल", "page": "पेज", "qty": "मात्रा", "car": "गाड़ी",
   "search": "खोजें", "index": "विषय सूची", "settings": "सेटिंग्स",
-  "pages": "पेज लिस्ट", "arvind index": "अरविन्द इंडेक्स"
+  "pages": "पेज लिस्ट", "arvind index": "अरविन्द इंडेक्स",
+  "total": "कुल", "delete": "हटाएं", "confirm": "पुष्टि करें"
 };
 
 const translateText = (text) => {
@@ -65,7 +66,7 @@ export default function ArvindRegister() {
   const [isHindi, setIsHindi] = useState(false);
   
   // --- NEW: App Lock State ---
-  const [isAppUnlocked, setIsAppUnlocked] = useState(false); // Locked by default
+  const [isAppUnlocked, setIsAppUnlocked] = useState(false); 
   const [loginPassInput, setLoginPassInput] = useState('');
   
   const [passInput, setPassInput] = useState('');
@@ -114,16 +115,14 @@ export default function ArvindRegister() {
   };
 
   const playAlertSound = () => {
-    // Play Audio
     if (audioRef.current) {
         audioRef.current.currentTime = 0;
         audioRef.current.play().catch(e => console.log("Audio play failed:", e));
     }
-    // Trigger Real Notification
     if ("Notification" in window && Notification.permission === "granted") {
         new Notification("Stock Alert!", { 
             body: "Inventory is running low!",
-            icon: "/icon.png" // Optional: add your icon path here
+            icon: "/icon.png"
         });
     }
   };
@@ -139,6 +138,22 @@ export default function ArvindRegister() {
     } else {
         alert("Wrong Password! Try again.");
         setLoginPassInput('');
+    }
+  };
+
+  // --- NEW: DELETE LOGIC WITH DOUBLE PERMISSION ---
+  const handleDeletePage = (e, pageId) => {
+    e.stopPropagation(); // Stop click from opening the page
+    if (window.confirm(t("Delete this page?"))) {
+        if (window.confirm(t("Double Check: This will delete ALL items in this page permanently. Are you sure?"))) {
+            const updatedPages = data.pages.filter(p => p.id !== pageId);
+            const updatedEntries = data.entries.filter(ent => ent.pageId !== pageId);
+            setData({ ...data, pages: updatedPages, entries: updatedEntries });
+            if(activePage && activePage.id === pageId) {
+                setView('generalIndex');
+                setActivePage(null);
+            }
+        }
     }
   };
 
@@ -168,7 +183,6 @@ export default function ArvindRegister() {
     const updatedEntries = data.entries.map(e => {
       if (e.id === id) {
         const newQty = Math.max(0, e.qty + amount);
-        // Alert trigger
         if (newQty < data.settings.limit && e.qty >= data.settings.limit) {
             playAlertSound();
         }
@@ -184,7 +198,14 @@ export default function ArvindRegister() {
     return data.pages.filter(p => p.itemName.toLowerCase().includes(indexSearchTerm.toLowerCase()));
   }, [data.pages, indexSearchTerm]);
 
-  // --- RENDER LOCK SCREEN (New Feature) ---
+  // --- HELPER: Common Header Button for Translation ---
+  const TranslateBtn = () => (
+    <button onClick={() => setIsHindi(!isHindi)} className={`p-2 rounded-full border ${isDark ? 'bg-slate-700 border-slate-500' : 'bg-white/50 border-black/10'}`}>
+      <Languages size={20}/>
+    </button>
+  );
+
+  // --- RENDER LOCK SCREEN ---
   if (!isAppUnlocked) {
     return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 p-6 text-white">
@@ -215,7 +236,7 @@ export default function ArvindRegister() {
     );
   }
 
-  // --- EXISTING COMPONENTS ---
+  // --- COMPONENT VIEWS ---
   const renderGeneralIndex = () => (
     <div className="pb-24">
       <div className={`p-6 border-b-4 border-double sticky top-0 z-10 ${isDark ? 'bg-slate-800 border-slate-600' : 'bg-yellow-100 border-yellow-400'}`}>
@@ -223,9 +244,8 @@ export default function ArvindRegister() {
           <h1 className={`text-2xl font-extrabold uppercase tracking-widest ${isDark ? 'text-white' : 'text-yellow-900'} underline decoration-2 decoration-red-400`}>
             {t("Arvind Index")}
           </h1>
-          <button onClick={() => setIsHindi(!isHindi)} className="bg-white/30 p-2 rounded-full border border-black/10">
-            <Languages size={24}/>
-          </button>
+          {/* Translation Toggle Here */}
+          <TranslateBtn />
         </div>
         <div className="flex gap-2 mt-3">
             <div className="relative flex-1">
@@ -244,20 +264,31 @@ export default function ArvindRegister() {
 
       <div className={`m-2 border-2 ${isDark ? 'border-slate-700 bg-slate-900' : 'border-black bg-white'}`}>
         <div className={`flex border-b-2 ${isDark ? 'border-slate-700 bg-slate-800' : 'border-black bg-gray-100'} p-2`}>
-          <div className="w-16 font-bold text-center border-r border-gray-400">S.No.</div>
+          <div className="w-12 font-bold text-center border-r border-gray-400">No.</div>
           <div className="flex-1 font-bold pl-3 border-r border-gray-400">{t("Particulars")}</div>
-          <div className="w-20 font-bold text-center">{t("Page No")}</div>
+          <div className="w-16 font-bold text-center border-r border-gray-400">{t("Page")}</div>
+          <div className="w-10 font-bold text-center">Del</div>
         </div>
         <div className="min-h-[60vh]">
           {filteredPages.map((page, idx) => (
             <div 
               key={page.id}
               onClick={() => { setActivePage(page); setView('page'); setPageSearchTerm(''); }}
-              className={`flex border-b border-gray-300 cursor-pointer hover:bg-blue-50 transition-colors h-12 items-center ${isDark ? 'text-white hover:bg-slate-800' : 'text-black'}`}
+              className={`flex border-b border-gray-300 cursor-pointer hover:bg-blue-50 transition-colors h-14 items-center ${isDark ? 'text-white hover:bg-slate-800' : 'text-black'}`}
             >
-              <div className="w-16 text-center font-bold text-red-600 border-r border-gray-300 h-full flex items-center justify-center">{idx + 1}</div>
+              <div className="w-12 text-center font-bold text-red-600 border-r border-gray-300 h-full flex items-center justify-center text-sm">{idx + 1}</div>
               <div className="flex-1 pl-3 font-semibold text-lg border-r border-gray-300 h-full flex items-center truncate">{t(page.itemName)}</div>
-              <div className="w-20 text-center font-bold text-blue-700 h-full flex items-center justify-center underline">{page.pageNo}</div>
+              <div className="w-16 text-center font-bold text-blue-700 h-full flex items-center justify-center underline border-r border-gray-300">{page.pageNo}</div>
+              
+              {/* DELETE BUTTON IN INDEX */}
+              <div className="w-10 flex items-center justify-center h-full">
+                <button 
+                    onClick={(e) => handleDeletePage(e, page.id)}
+                    className="p-2 text-red-400 hover:text-red-600 hover:bg-red-100 rounded-full"
+                >
+                    <Trash2 size={16} />
+                </button>
+              </div>
             </div>
           ))}
           {filteredPages.length === 0 && <div className="p-4 text-center text-gray-400">Not Found</div>}
@@ -272,25 +303,31 @@ export default function ArvindRegister() {
 
   const renderPagesGrid = () => (
     <div className={`pb-24 min-h-screen p-4 ${isDark ? 'bg-slate-950' : 'bg-gray-100'}`}>
-        <div className="mb-4 sticky top-0 z-10 pt-2 pb-2 backdrop-blur-sm">
-            <h1 className={`text-2xl font-bold mb-3 flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-800'}`}>
+        <div className="mb-4 sticky top-0 z-10 pt-2 pb-2 backdrop-blur-sm flex justify-between items-center">
+            <h1 className={`text-2xl font-bold flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-800'}`}>
                 <Grid/> {t("All Pages")}
             </h1>
-            <div className="flex gap-2">
-                <div className="relative flex-1">
-                    <input className={`w-full pl-9 p-3 rounded-xl border outline-none shadow-sm ${isDark ? 'bg-slate-800 border-slate-600 text-white' : 'bg-white border-gray-300 text-black'}`} placeholder={t("Find Page...")} value={indexSearchTerm} onChange={e => setIndexSearchTerm(e.target.value)}/>
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20}/>
-                </div>
-                <VoiceInput onResult={setIndexSearchTerm} isDark={isDark} />
+            {/* Translation Toggle Here */}
+            <TranslateBtn />
+        </div>
+        <div className="flex gap-2 mb-4">
+            <div className="relative flex-1">
+                <input className={`w-full pl-9 p-3 rounded-xl border outline-none shadow-sm ${isDark ? 'bg-slate-800 border-slate-600 text-white' : 'bg-white border-gray-300 text-black'}`} placeholder={t("Find Page...")} value={indexSearchTerm} onChange={e => setIndexSearchTerm(e.target.value)}/>
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20}/>
             </div>
+            <VoiceInput onResult={setIndexSearchTerm} isDark={isDark} />
         </div>
         <div className="grid grid-cols-2 gap-3">
             {filteredPages.map(page => {
                  const totalItems = data.entries.filter(e => e.pageId === page.id).reduce((a,b)=>a+b.qty,0);
                  return (
-                    <div key={page.id} onClick={() => { setActivePage(page); setView('page'); setPageSearchTerm(''); }} className={`p-4 rounded-xl border-2 shadow-sm cursor-pointer active:scale-95 transition-all flex flex-col justify-between h-32 ${isDark ? 'bg-slate-800 border-slate-600 hover:border-blue-500' : 'bg-white border-gray-200 hover:border-blue-500'}`}>
+                    <div key={page.id} onClick={() => { setActivePage(page); setView('page'); setPageSearchTerm(''); }} className={`relative p-4 rounded-xl border-2 shadow-sm cursor-pointer active:scale-95 transition-all flex flex-col justify-between h-36 ${isDark ? 'bg-slate-800 border-slate-600 hover:border-blue-500' : 'bg-white border-gray-200 hover:border-blue-500'}`}>
                         <div>
-                            <div className="flex justify-between items-start"><span className="text-xs font-bold px-2 py-1 rounded bg-gray-200 text-gray-800">Pg {page.pageNo}</span></div>
+                            <div className="flex justify-between items-start">
+                                <span className="text-xs font-bold px-2 py-1 rounded bg-gray-200 text-gray-800">Pg {page.pageNo}</span>
+                                {/* DELETE BUTTON IN GRID */}
+                                <button onClick={(e) => handleDeletePage(e, page.id)} className="p-1 text-red-300 hover:text-red-600 hover:bg-red-50 rounded"><Trash2 size={16}/></button>
+                            </div>
                             <h3 className={`font-bold text-lg mt-2 leading-tight ${isDark ? 'text-white' : 'text-gray-800'}`}>{t(page.itemName)}</h3>
                         </div>
                         <div className="text-right"><span className={`text-xs font-bold ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>{totalItems} Pcs</span></div>
@@ -307,14 +344,27 @@ export default function ArvindRegister() {
   const renderPage = () => {
     const pageEntries = data.entries.filter(e => e.pageId === activePage.id);
     const filtered = pageEntries.filter(e => e.car.toLowerCase().includes(pageSearchTerm.toLowerCase()));
+    
+    // --- NEW: Calculate Total Quantity for the whole page ---
+    const grandTotal = pageEntries.reduce((acc, curr) => acc + curr.qty, 0);
+
     return (
       <div className={`pb-24 min-h-screen ${isDark ? 'bg-slate-950 text-white' : 'bg-white text-black'}`}>
         <div className={`sticky top-0 z-10 border-b-2 shadow-sm ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-red-200'}`}>
            <div className={`flex items-center p-3 ${isDark ? 'bg-slate-800' : 'bg-red-50'}`}>
               <button onClick={() => setView('generalIndex')} className="mr-2 p-2"><ArrowLeft/></button>
               <div className="flex-1">
-                 <p className={`text-xs font-bold uppercase ${isDark ? 'text-slate-400' : 'text-red-400'}`}>{t("Page No")}: {activePage.pageNo}</p>
+                 <div className="flex justify-between items-start">
+                    <p className={`text-xs font-bold uppercase ${isDark ? 'text-slate-400' : 'text-red-400'}`}>{t("Page No")}: {activePage.pageNo}</p>
+                    {/* Translation Toggle Here */}
+                    <TranslateBtn />
+                 </div>
                  <h2 className="text-2xl font-black uppercase">{t(activePage.itemName)}</h2>
+                 
+                 {/* SHOW GRAND TOTAL HERE */}
+                 <div className="text-xs font-bold opacity-70 mt-1">
+                    {t("Total")} {t("Items")}: {grandTotal}
+                 </div>
               </div>
            </div>
            <div className={`p-2 flex gap-2 border-t ${isDark ? 'border-slate-700' : 'border-gray-100'}`}>
@@ -348,7 +398,10 @@ export default function ArvindRegister() {
 
   const renderAlerts = () => (
      <div className={`p-4 pb-24 min-h-screen ${isDark ? 'bg-slate-950 text-white' : 'bg-gray-50 text-black'}`}>
-        <h2 className="text-2xl font-bold text-red-500 mb-4 flex items-center gap-2"><AlertTriangle/> {t("Low Stock")}</h2>
+        <div className="flex justify-between items-center mb-4">
+            <h2 className="text-2xl font-bold text-red-500 flex items-center gap-2"><AlertTriangle/> {t("Low Stock")}</h2>
+            <TranslateBtn />
+        </div>
         {data.entries.filter(e => e.qty < data.settings.limit).length === 0 && <div className="text-center mt-10 opacity-50">Stock Full</div>}
         {data.entries.filter(e => e.qty < data.settings.limit).map(e => {
            const p = data.pages.find(page => page.id === e.pageId);
@@ -364,7 +417,10 @@ export default function ArvindRegister() {
 
   const renderSettings = () => (
     <div className={`p-4 pb-24 min-h-screen ${isDark ? 'bg-slate-900 text-white' : 'bg-gray-50 text-black'}`}>
-       <h2 className="text-2xl font-bold mb-6 flex items-center gap-2"><Settings/> {t("Settings")}</h2>
+       <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold flex items-center gap-2"><Settings/> {t("Settings")}</h2>
+            <TranslateBtn />
+       </div>
        
        {/* App Install Button */}
        <div className={`p-4 rounded-xl border mb-4 bg-gradient-to-r from-blue-600 to-blue-800 text-white`}>
@@ -454,6 +510,19 @@ export default function ArvindRegister() {
                  <input autoFocus className="flex-1 border-2 border-black rounded p-3 text-lg font-bold text-black" placeholder="Car Name" value={input.carName} onChange={e => setInput({...input, carName: e.target.value})} />
                  <VoiceInput onResult={(txt) => setInput(prev => ({...prev, carName: txt}))} isDark={false} />
               </div>
+              
+              {/* NEW: SHOW EXISTING STOCK IF AVAILABLE */}
+              {input.carName && (() => {
+                const existing = data.entries
+                   .filter(e => e.pageId === activePage.id && e.car.toLowerCase().includes(input.carName.toLowerCase()))
+                   .reduce((a,b) => a+b.qty, 0);
+                return existing > 0 ? (
+                    <div className="p-2 bg-yellow-100 border border-yellow-300 rounded text-yellow-800 text-sm font-bold text-center">
+                        Already have {existing} in stock!
+                    </div>
+                ) : null;
+              })()}
+
               <input type="number" className="w-full border-2 border-black rounded p-3 text-lg font-bold text-black" placeholder="Qty" value={input.qty} onChange={e => setInput({...input, qty: e.target.value})} />
             </div>
             <div className="flex gap-3 mt-6">
