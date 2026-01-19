@@ -3,7 +3,8 @@ import {
     Store, Activity, PenTool, Bell, Shield, Download, HelpCircle,
     CheckCircle, Type, Vibrate, AlertCircle, Zap, Package, AlertTriangle,
     Clock, Lock, SaveAll, FileText, Wifi, WifiOff, MessageSquare,
-    ExternalLink, LogOut, ChevronRight, User, Copy, ShieldCheck, Layers
+    ExternalLink, LogOut, ChevronRight, User, Copy, ShieldCheck, Layers,
+    Settings
 } from 'lucide-react';
 
 interface SettingsPanelProps {
@@ -193,18 +194,24 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                                         className={`w-full p-3 rounded-xl border ${isDark ? 'bg-slate-700 border-slate-600' : 'bg-gray-50 border-gray-200'}`}
                                     />
                                 </div>
-                                <User size={18} className="text-orange-500" />
-                                <span className="font-bold">{t("Your Customer ID")}</span>
                             </div>
-                            <div className="flex gap-2 items-center">
-                                <code className={`flex-1 p-2 rounded-lg font-mono text-xs break-all select-all ${isDark ? 'bg-slate-700' : 'bg-white'}`}>
-                                    {user.uid}
-                                </code>
-                                <button onClick={() => { navigator.clipboard.writeText(user.uid); showToast("ID Copied!"); }} className="p-2 bg-orange-500 text-white rounded-lg active:scale-95 transition-transform shadow">
-                                    <Copy size={18} />
-                                </button>
+
+                            {/* Customer ID */}
+                            <div className={`p-3 rounded-xl border ${isDark ? 'bg-slate-700/50 border-slate-600' : 'bg-gray-50 border-gray-200'}`}>
+                                <div className="flex items-center gap-2 mb-2">
+                                    <User size={18} className="text-orange-500" />
+                                    <span className="font-bold">{t("Your Customer ID")}</span>
+                                </div>
+                                <div className="flex gap-2 items-center">
+                                    <code className={`flex-1 p-2 rounded-lg font-mono text-xs break-all select-all ${isDark ? 'bg-slate-700' : 'bg-white'}`}>
+                                        {user.uid}
+                                    </code>
+                                    <button onClick={() => { navigator.clipboard.writeText(user.uid); showToast("ID Copied!"); }} className="p-2 bg-orange-500 text-white rounded-lg active:scale-95 transition-transform shadow">
+                                        <Copy size={18} />
+                                    </button>
+                                </div>
+                                <p className="text-[10px] opacity-50 mt-2">{t("Share this ID for support")}</p>
                             </div>
-                            <p className="text-[10px] opacity-50 mt-2">{t("Share this ID for support")}</p>
                         </div>
 
                         {/* Business Tools */}

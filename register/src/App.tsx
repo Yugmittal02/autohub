@@ -1460,10 +1460,21 @@ function DukanRegister() {
   useEffect(() => {
     if (!user) return;
     setDbLoading(true);
-    window.addEventListener('online', () => setIsOnline(true));
-    window.addEventListener('offline', () => setIsOnline(false));
+
+    // Safety timeout - Force loading to complete after 10 seconds to prevent infinite loading
+    const loadingTimeout = setTimeout(() => {
+      console.warn('Loading timeout reached - forcing load completion');
+      setDbLoading(false);
+    }, 10000);
+
+    // Define handlers so we can properly clean them up
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
 
     const unsubDb = onSnapshot(doc(db, "appData", user.uid), (docSnapshot) => {
+      clearTimeout(loadingTimeout); // Clear timeout since we got a response
       try {
         if (docSnapshot.exists()) {
           // store doc id for diagnostics / admin contact display
@@ -1478,8 +1489,6 @@ function DukanRegister() {
           if (!Array.isArray(cloudData.entries)) cloudData.entries = [];
           if (!Array.isArray(cloudData.bills)) cloudData.bills = [];
           if (!cloudData.settings.productPassword) cloudData.settings.productPassword = '0000';
-
-          if (cloudData.settings.limit) setTempLimit(cloudData.settings.limit);
 
           // Merge transient local state (previewUrl, uploading/progress/tempBlob, uploadFailed)
           const localBills = (dataRef.current && dataRef.current.bills) ? dataRef.current.bills : [];
@@ -1506,20 +1515,36 @@ function DukanRegister() {
 
           setData(finalData);
         } else {
-          setDoc(doc(db, "appData", user.uid), defaultData);
+          // New user - create default document and set data immediately
+          setDoc(doc(db, "appData", user.uid), defaultData)
+            .then(() => {
+              console.info('Created default data for new user');
+            })
+            .catch((err) => {
+              console.error('Failed to create default data:', err);
+            });
+          // Set default data immediately so UI doesn't wait
+          setData(defaultData);
+          setDbLoading(false);
         }
       } catch (err) {
         console.error("Data Processing Error:", err);
-        // Don't crash loading, just let it finish (maybe show empty?)
+        // Don't crash loading, just show default data
+        setData(defaultData);
       } finally {
         setDbLoading(false);
       }
     }, (error) => {
-    }, (error) => {
+      clearTimeout(loadingTimeout);
       console.error("DB Error:", error);
       setDbLoading(false);
     });
-    return () => unsubDb();
+    return () => {
+      clearTimeout(loadingTimeout);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      unsubDb();
+    };
   }, [user]);
 
   const handleAuth = async (e) => {

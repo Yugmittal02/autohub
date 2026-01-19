@@ -9,7 +9,15 @@ const looksCorruptedTranslation = (value: unknown): boolean => {
     if (value === null || value === undefined) return false;
     const s = String(value);
     if (!s) return false;
+
+    // Check for Unicode replacement character (real encoding issue)
     if (s.includes('\uFFFD')) return true;
+
+    // If string contains valid Devanagari/Hindi characters (U+0900-U+097F), it's valid
+    const hasValidHindi = /[\u0900-\u097F]/.test(s);
+    if (hasValidHindi) return false;
+
+    // Only check for '?' corruption if no valid Hindi present
     const qCount = (s.match(/\?/g) || []).length;
     // If a meaningful chunk of the string is '?', it's almost certainly an encoding/placeholder issue.
     return qCount >= 2 && qCount / Math.max(1, s.length) > 0.12;
@@ -141,11 +149,11 @@ export const convertToHindiFallback = (text: any) => {
                     i += 2;
                 } else if (soundMap[char]) {
                     if (i === 0 && ['a', 'e', 'i', 'o', 'u'].includes(char)) {
-                        if (char === 'a') hindiWord += '?';
-                        else if (char === 'e') hindiWord += '?';
-                        else if (char === 'i') hindiWord += '?';
-                        else if (char === 'o') hindiWord += '?';
-                        else if (char === 'u') hindiWord += '?';
+                        if (char === 'a') hindiWord += 'अ';
+                        else if (char === 'e') hindiWord += 'ए';
+                        else if (char === 'i') hindiWord += 'इ';
+                        else if (char === 'o') hindiWord += 'ओ';
+                        else if (char === 'u') hindiWord += 'उ';
                     } else {
                         hindiWord += soundMap[char];
                     }
