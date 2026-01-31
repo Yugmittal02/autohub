@@ -2991,7 +2991,6 @@ function DukanRegister() {
         requestNotificationPermission={requestNotificationPermission}
         setIsPrivacyOpen={setIsPrivacyOpen}
         setIsFaqOpen={setIsFaqOpen}
-        setIsFaqOpen={setIsFaqOpen}
         handleLogout={handleLogout}
         triggerConfirm={triggerConfirm}
         setPreviousView={setPreviousView}
