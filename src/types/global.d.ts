@@ -1,5 +1,4 @@
-/// <reference types="vite/client" />
-/// <reference types="vite-plugin-pwa/client" />
+// Global type declarations for AutoHub ERP
 
 // Extend Window interface for Speech Recognition and custom properties
 interface Window {

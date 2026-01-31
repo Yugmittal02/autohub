@@ -31,13 +31,14 @@ interface SettingsPanelProps {
     setIsFaqOpen: (open: boolean) => void;
     handleLogout: () => void;
     triggerConfirm: (title: string, msg: string, isDanger: boolean, onConfirm: () => void) => void;
+    setPreviousView: (view: string) => void;
 }
 
 const SettingsPanel: React.FC<SettingsPanelProps> = ({
     isDark, t, settingsUnlocked, handleSettingsUnlock, settingsPassInput, setSettingsPassInput,
     settingsTab, setSettingsTab, data, setData, pushToFirebase, user, setView,
     deferredPrompt, setDeferredPrompt, showToast, themePreset, notifPermission,
-    requestNotificationPermission, setIsPrivacyOpen, setIsFaqOpen, handleLogout, triggerConfirm
+    requestNotificationPermission, setIsPrivacyOpen, setIsFaqOpen, handleLogout, triggerConfirm, setPreviousView
 }) => {
     const [tempLimit, setTempLimit] = useState(data.settings?.limit || 5);
     const [newProductPass, setNewProductPass] = useState('');
@@ -215,7 +216,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                         </div>
 
                         {/* Business Tools */}
-                        <button onClick={() => setView('tools')} className={`w-full p-4 rounded-2xl flex items-center justify-between gap-2 shadow-sm border ${isDark ? 'bg-gradient-to-r from-slate-800 to-blue-900/30 border-blue-500/30' : 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200'}`}>
+                        <button onClick={() => { setPreviousView('settings'); setView('tools'); }} className={`w-full p-4 rounded-2xl flex items-center justify-between gap-2 shadow-sm border ${isDark ? 'bg-gradient-to-r from-slate-800 to-blue-900/30 border-blue-500/30' : 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200'}`}>
                             <div className="flex items-center gap-3">
                                 <div className="p-2 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl shadow"><Package size={20} className="text-white" /></div>
                                 <div className="text-left">

@@ -912,15 +912,23 @@ const SmartSearchEngine = {
 
 // --- SUB-COMPONENTS ---
 
-class ErrorBoundary extends React.Component {
-  constructor(props) {
+interface ErrorBoundaryProps {
+  children: React.ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+}
+
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false };
   }
   static getDerivedStateFromError() {
     return { hasError: true };
   }
-  componentDidCatch(error, errorInfo) {
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error("App Error:", error, errorInfo);
   }
   render() {
@@ -1088,7 +1096,18 @@ const LegalModal = ({ isOpen, onClose, type, t, isDark }) => {
   );
 };
 
-const EntryRow = React.memo(({ entry, t, isDark, onUpdateBuffer, onEdit, limit, tempQty, index }) => {
+interface EntryRowProps {
+  entry: { id: number; car: string; qty: number };
+  t: (text: string) => string;
+  isDark: boolean;
+  onUpdateBuffer: (id: number, amount: number, currentQty: number) => void;
+  onEdit: (entry: any) => void;
+  limit: number;
+  tempQty: number | undefined;
+  index: number;
+}
+
+const EntryRow = React.memo(({ entry, t, isDark, onUpdateBuffer, onEdit, limit, tempQty, index }: EntryRowProps) => {
   const displayQty = tempQty !== undefined ? tempQty : entry.qty;
   const isChanged = tempQty !== undefined;
 
@@ -1277,11 +1296,49 @@ const NavBtn = ({ icon, label, active, onClick, alert, isDark, accentHex }: any)
 );
 
 
-const defaultData = {
+interface AppSettings {
+  limit: number;
+  theme: string;
+  accentColor: string;
+  shakeToSearch: boolean;
+  productPassword: string;
+  shopName: string;
+  pinnedTools: string[];
+  fontSize?: string;
+  fuzzySearch?: boolean;
+  voiceAI?: boolean;
+  aiPredictions?: boolean;
+  widgets?: {
+    aiInsights?: boolean;
+    predictions?: boolean;
+  } | boolean;
+}
+
+interface GpsReminder {
+  id: number;
+  carNumber: string;
+  customerName: string;
+  mobileNumber: string;
+  expiryDate: string; // ISO date string
+  status: 'active' | 'expired' | 'renewed';
+}
+
+interface AppDataType {
+  pages: any[];
+  entries: any[];
+  bills: any[];
+  salesEvents: any[];
+  gpsReminders: GpsReminder[];
+  settings: AppSettings;
+  appStatus: string;
+}
+
+const defaultData: AppDataType = {
   pages: [],
   entries: [],
   bills: [],
   salesEvents: [],
+  gpsReminders: [],
   settings: { limit: 5, theme: 'light', accentColor: 'blue', shakeToSearch: true, productPassword: '0000', shopName: 'Autonex', pinnedTools: [] },
   appStatus: 'active'
 };
@@ -1299,7 +1356,7 @@ function DukanRegister() {
   const [password, setPassword] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
 
-  const [data, setData] = useState(defaultData);
+  const [data, setData] = useState<AppDataType>(defaultData);
   const [dbLoading, setDbLoading] = useState(false);
   const [fbDocId, setFbDocId] = useState(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -1308,6 +1365,13 @@ function DukanRegister() {
   const [activePageId, setActivePageId] = useState(null);
   const [activeToolId, setActiveToolId] = useState(null);
   const [initialNoteId, setInitialNoteId] = useState<number | null>(null);
+
+  // Alerts Tab State
+  const [alertTab, setAlertTab] = useState<'stock' | 'gps'>('stock');
+  const [gpsInput, setGpsInput] = useState({ carNumber: '', customerName: '', mobileNumber: '', expiryDate: '' });
+  const [editingGpsId, setEditingGpsId] = useState<number | null>(null);
+  const [gpsSearchTerm, setGpsSearchTerm] = useState('');
+  const [validityDays, setValidityDays] = useState('');
 
 
   // ?? GHOST MIC STATE
@@ -1365,7 +1429,8 @@ function DukanRegister() {
   const [managingPage, setManagingPage] = useState(null);
 
   const [input, setInput] = useState({ itemName: '', carName: '', qty: '' });
-  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [previousView, setPreviousView] = useState<string | null>(null); // Track previous view for smart back navigation
   const [notifPermission, setNotifPermission] = useState('default');
   const [toast, setToast] = useState(null);
 
@@ -1432,7 +1497,7 @@ function DukanRegister() {
   //  Apply Font Size setting to document
   useEffect(() => {
     const fontSize = data.settings?.fontSize || 'Medium';
-    const fontSizeMap = { 'Small': '14px', 'Medium': '16px', 'Large': '18px' };
+    const fontSizeMap: Record<string, string> = { 'Small': '14px', 'Medium': '16px', 'Large': '18px' };
     document.documentElement.style.fontSize = fontSizeMap[fontSize] || '16px';
   }, [data.settings?.fontSize]);
 
@@ -1516,7 +1581,7 @@ function DukanRegister() {
           const cloudIds = new Set((cloudData.bills || []).map((b: any) => b.id));
           const localOnly = localBills.filter((b: any) => !cloudIds.has(b.id));
 
-          const finalData = { ...cloudData, bills: [...localOnly, ...mergedBills] };
+          const finalData = { ...cloudData, bills: [...localOnly, ...mergedBills] } as AppDataType;
 
           setData(finalData);
         } else {
@@ -2475,7 +2540,7 @@ function DukanRegister() {
       */}
 
       {/* ?? SALES PREDICTION WIDGET */}
-      {data.settings?.aiPredictions && (data.settings?.widgets?.predictions !== false) && (
+      {data.settings?.aiPredictions && (typeof data.settings?.widgets !== 'boolean' ? data.settings?.widgets?.predictions !== false : true) && (
         <SalesPredictionWidget data={data} t={t} isDark={isDark} />
       )}
 
@@ -2485,9 +2550,9 @@ function DukanRegister() {
         onNavigate={(pageId) => { setActivePageId(pageId); setView('page'); }}
       />
 
+      {/* Recent Notes Widget hidden to save dashboard space
       <RecentNotesWidget
         onNavigate={(noteId) => {
-          // Reset tool view state first
           setActiveToolId(null);
           setTimeout(() => {
             setActiveToolId('notes');
@@ -2498,12 +2563,14 @@ function DukanRegister() {
         isDark={isDark}
         t={t}
       />
+      */}
 
 
       {data.settings.pinnedTools && data.settings.pinnedTools.length > 0 && (
         <div className={`py-3 px-4 border-b overflow-x-auto whitespace-nowrap flex gap-3 hide-scrollbar ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-gray-50 border-gray-200'}`}>
           {[
             { id: 'basicCalc', icon: <Calculator size={18} />, label: 'Calc', col: 'text-teal-600 bg-teal-100' },
+            { id: 'quotation', icon: <FileText size={18} />, label: 'Quote', col: 'text-indigo-600 bg-indigo-100' },
             { id: 'invoice', icon: <FileText size={18} />, label: 'Bill', col: 'text-indigo-600 bg-indigo-100' },
             { id: 'gst', icon: <Percent size={18} />, label: 'GST', col: 'text-blue-600 bg-blue-100' },
             { id: 'margin', icon: <Calculator size={18} />, label: 'Profit', col: 'text-purple-600 bg-purple-100' },
@@ -2514,7 +2581,7 @@ function DukanRegister() {
             { id: 'notes', icon: <StickyNote size={18} />, label: 'Notes', col: 'text-yellow-600 bg-yellow-100' },
             { id: 'translator', icon: <Languages size={18} />, label: 'Trans', col: 'text-pink-600 bg-pink-100' },
           ].filter(t => data.settings.pinnedTools.includes(t.id)).map(tool => (
-            <button key={tool.id} onClick={() => { setActiveToolId(tool.id); setView('tools'); }} className={`inline-flex items-center gap-2 px-3 py-2 rounded-full font-bold text-sm shadow-sm border ${tool.col} border-transparent hover:scale-105 transition-transform`}>
+            <button key={tool.id} onClick={() => { setActiveToolId(tool.id); setPreviousView('generalIndex'); setView('tools'); }} className={`inline-flex items-center gap-2 px-3 py-2 rounded-full font-bold text-sm shadow-sm border ${tool.col} border-transparent hover:scale-105 transition-transform`}>
               {tool.icon} {tool.label}
             </button>
           ))}
@@ -2542,7 +2609,11 @@ function DukanRegister() {
               </div>
             </div>
           ))}
-          {globalSearchResults.pages.length === 0 && <div className="p-8 text-center text-gray-400">\n            <Book size={48} className="mx-auto mb-3 opacity-30" />\n            <p className="font-semibold">{t("No Pages Found")}</p>\n            <p className="text-xs mt-1">Tap + to create your first page</p>\n          </div>}
+          {globalSearchResults.pages.length === 0 && <div className="p-8 text-center text-gray-400">
+            <Book size={48} className="mx-auto mb-3 opacity-30" />
+            <p className="font-semibold">{t("No Pages Found")}</p>
+            <p className="text-xs mt-1">Tap + to create your first page</p>
+          </div>}
         </div>
       </div>
       <button
@@ -2648,19 +2719,172 @@ function DukanRegister() {
   };
 
 
+  const handleSaveGpsReminder = async () => {
+    if (!gpsInput.carNumber || !gpsInput.expiryDate) { showToast(t("Please fill details"), "error"); return; }
+
+    let newReminders = [...(data.gpsReminders || [])];
+
+    if (editingGpsId) {
+      newReminders = newReminders.map(r => r.id === editingGpsId ? { ...r, ...gpsInput, id: r.id } : r);
+      showToast(t("Reminder Updated"));
+    } else {
+      const newReminder: GpsReminder = {
+        id: Date.now(),
+        ...gpsInput,
+        status: 'active'
+      };
+      newReminders = [newReminder, ...newReminders];
+      showToast(t("GPS Reminder Set"));
+    }
+
+    const newData = { ...data, gpsReminders: newReminders };
+    await pushToFirebase(newData);
+    resetGpsForm();
+  };
+
+  const handleEditGpsReminder = (reminder: GpsReminder) => {
+    setGpsInput({
+      carNumber: reminder.carNumber,
+      customerName: reminder.customerName,
+      mobileNumber: reminder.mobileNumber,
+      expiryDate: reminder.expiryDate
+    });
+    setValidityDays(''); // Reset days on edit as we have a date
+    setEditingGpsId(reminder.id);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const resetGpsForm = () => {
+    setGpsInput({ carNumber: '', customerName: '', mobileNumber: '', expiryDate: '' });
+    setValidityDays('');
+    setEditingGpsId(null);
+  };
+
+  const handleDeleteGpsReminder = async (id: number) => {
+    triggerConfirm(t("Delete Reminder?"), t("Are you sure?"), true, async () => {
+      const newData = { ...data, gpsReminders: (data.gpsReminders || []).filter(r => r.id !== id) };
+      await pushToFirebase(newData);
+      showToast(t("Reminder Deleted"));
+    });
+  };
+
+  const handleDaysInput = (days: string) => {
+    setValidityDays(days);
+    if (!days) return;
+    const d = new Date();
+    d.setDate(d.getDate() + parseInt(days));
+    setGpsInput(prev => ({ ...prev, expiryDate: d.toISOString().split('T')[0] }));
+  };
+
   const renderAlerts = () => (
     <div className={`p-4 pb-24 min-h-screen ${isDark ? 'bg-slate-950 text-white' : 'bg-gray-50 text-black'}`}>
-      <div className="flex justify-between items-center mb-4"><h2 className="text-2xl font-bold text-red-500 flex items-center gap-2"><AlertTriangle /> {t("Low Stock")}</h2><TranslateBtn isHindi={isHindi} setIsHindi={setIsHindi} isDark={isDark} /></div>
-      {(data.entries || []).filter(e => e.qty < data.settings.limit).length === 0 && <div className="text-center mt-10 opacity-50">{t("Stock Full")}</div>}
-      {(data.entries || []).filter(e => e.qty < data.settings.limit).map(e => {
-        const p = (data.pages || []).find(page => page.id === e.pageId);
-        return (
-          <div key={e.id} className="p-4 border-l-4 border-red-500 bg-white text-black shadow mb-2 rounded flex justify-between items-center" onClick={() => { if (p) { setActivePageId(p.id); setView('page'); } }}>
-            <div><h3 className="font-bold">{t(e.car)}</h3><p className="text-xs">{t(p?.itemName || "Unknown")}</p></div>
-            <span className="text-2xl font-bold text-red-600">{e.qty}</span>
+      <div className="flex bg-gray-200 dark:bg-slate-800 p-1 rounded-xl mb-6 sticky top-0 z-10 shadow-sm backdrop-blur-md bg-opacity-80">
+        <button onClick={() => setAlertTab('stock')} className={`flex-1 py-3 rounded-lg font-bold transition-all flex items-center justify-center gap-2 ${alertTab === 'stock' ? 'bg-white dark:bg-slate-700 shadow text-red-500' : 'text-gray-500 dark:text-gray-400'}`}><AlertTriangle size={18} /> {t("Stock")}</button>
+        <button onClick={() => setAlertTab('gps')} className={`flex-1 py-3 rounded-lg font-bold transition-all flex items-center justify-center gap-2 ${alertTab === 'gps' ? 'bg-white dark:bg-slate-700 shadow text-blue-500' : 'text-gray-500 dark:text-gray-400'}`}><Zap size={18} /> {t("GPS")}</button>
+      </div>
+
+      {alertTab === 'stock' ? (
+        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div className="flex justify-between items-center mb-4"><h2 className="text-2xl font-bold text-red-500 flex items-center gap-2"><AlertTriangle /> {t("Low Stock")}</h2><TranslateBtn isHindi={isHindi} setIsHindi={setIsHindi} isDark={isDark} /></div>
+          {(data.entries || []).filter(e => e.qty < data.settings.limit).length === 0 && <div className="text-center mt-10 opacity-50 flex flex-col items-center gap-2"><CheckCircle size={48} className="text-green-500" />{t("Stock Full")}</div>}
+          {(data.entries || []).filter(e => e.qty < data.settings.limit).map(e => {
+            const p = (data.pages || []).find(page => page.id === e.pageId);
+            return (
+              <div key={e.id} className="p-4 border-l-4 border-red-500 bg-white dark:bg-slate-800 text-black dark:text-white shadow-sm hover:shadow-md transition-shadow mb-2 rounded-xl flex justify-between items-center cursor-pointer group" onClick={() => { if (p) { setActivePageId(p.id); setView('page'); } }}>
+                <div>
+                  <h3 className="font-bold group-hover:text-blue-500 transition-colors">{t(e.car)}</h3>
+                  <p className="text-xs opacity-70 flex items-center gap-1"><Book size={10} /> {t(p?.itemName || "Unknown")}</p>
+                </div>
+                <span className="text-2xl font-bold text-red-600 bg-red-50 dark:bg-red-900/30 px-3 py-1 rounded-lg">{e.qty}</span>
+              </div>
+            )
+          })}
+        </div>
+      ) : (
+        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div className={`p-5 rounded-2xl mb-6 shadow-lg border relative overflow-hidden ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-blue-100'}`}>
+            {editingGpsId && <div className="absolute top-0 right-0 bg-yellow-400 text-black text-xs font-bold px-3 py-1 rounded-bl-xl shadow-sm">EDITING MODE</div>}
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-lg flex items-center gap-2">{editingGpsId ? <Edit size={18} className="text-yellow-500" /> : <Plus size={18} className="text-blue-500" />} {editingGpsId ? t("Update Reminder") : t("Add New Reminder")}</h3>
+              {editingGpsId && <button onClick={resetGpsForm} className="text-xs bg-gray-100 dark:bg-slate-700 px-2 py-1 rounded hover:bg-gray-200">{t("Cancel")}</button>}
+            </div>
+
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <input className={`w-full p-3 rounded-xl outline-none border transition-all focus:ring-2 focus:ring-blue-500 ${isDark ? 'bg-slate-700 border-slate-600 focus:border-blue-500' : 'bg-gray-50 border-gray-200 focus:border-blue-500'}`} placeholder={t("Car Number")} value={gpsInput.carNumber} onChange={e => setGpsInput({ ...gpsInput, carNumber: e.target.value.toUpperCase() })} />
+                <input className={`w-full p-3 rounded-xl outline-none border transition-all focus:ring-2 focus:ring-blue-500 ${isDark ? 'bg-slate-700 border-slate-600 focus:border-blue-500' : 'bg-gray-50 border-gray-200 focus:border-blue-500'}`} placeholder={t("Mobile No.")} value={gpsInput.mobileNumber} onChange={e => setGpsInput({ ...gpsInput, mobileNumber: e.target.value })} type="tel" maxLength={10} />
+              </div>
+              <input className={`w-full p-3 rounded-xl outline-none border transition-all focus:ring-2 focus:ring-blue-500 ${isDark ? 'bg-slate-700 border-slate-600 focus:border-blue-500' : 'bg-gray-50 border-gray-200 focus:border-blue-500'}`} placeholder={t("Customer Name (Optional)")} value={gpsInput.customerName} onChange={e => setGpsInput({ ...gpsInput, customerName: e.target.value })} />
+
+              <div className="p-3 bg-blue-50 dark:bg-slate-700/50 rounded-xl border border-blue-100 dark:border-slate-600">
+                <label className="text-xs font-bold block mb-2 opacity-70 uppercase tracking-wide">{t("Set Expiry Via")}</label>
+                <div className="flex gap-3 items-center">
+                  <div className="flex-1 relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold opacity-50">Days</span>
+                    <input className={`w-full pl-12 p-2.5 rounded-lg outline-none border text-center font-bold ${isDark ? 'bg-slate-800 border-slate-600' : 'bg-white border-gray-200'}`} placeholder="365" value={validityDays} onChange={e => handleDaysInput(e.target.value)} type="number" />
+                  </div>
+                  <span className="text-xs font-bold opacity-50">OR</span>
+                  <div className="flex-[2]">
+                    <input className={`w-full p-2.5 rounded-lg outline-none border ${isDark ? 'bg-slate-800 border-slate-600' : 'bg-white border-gray-200'}`} type="date" value={gpsInput.expiryDate} onChange={e => { setGpsInput({ ...gpsInput, expiryDate: e.target.value }); setValidityDays(''); }} />
+                  </div>
+                </div>
+              </div>
+
+              <button onClick={handleSaveGpsReminder} className={`w-full py-3.5 rounded-xl font-bold shadow-lg text-white transition-all active:scale-95 flex items-center justify-center gap-2 ${editingGpsId ? 'bg-gradient-to-r from-yellow-500 to-orange-500 shadow-yellow-500/30' : 'bg-gradient-to-r from-blue-600 to-indigo-600 shadow-blue-500/30'}`}>
+                {editingGpsId ? <SaveAll size={20} /> : <Plus size={20} />} {editingGpsId ? t("Update Reminder") : t("Set Reminder")}
+              </button>
+            </div>
           </div>
-        )
-      })}
+
+          <div className="mb-4 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 opacity-40" size={18} />
+            <input
+              className={`w-full pl-10 p-3 rounded-xl outline-none border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}
+              placeholder={t("Search by Car No. or Name...")}
+              value={gpsSearchTerm}
+              onChange={e => setGpsSearchTerm(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-3">
+            {(data.gpsReminders || [])
+              .filter(r =>
+                r.carNumber.toLowerCase().includes(gpsSearchTerm.toLowerCase()) ||
+                r.customerName.toLowerCase().includes(gpsSearchTerm.toLowerCase()) ||
+                r.mobileNumber.includes(gpsSearchTerm)
+              )
+              .sort((a, b) => new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime())
+              .map(reminder => {
+                const daysLeft = Math.ceil((new Date(reminder.expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                const isExpired = daysLeft < 0;
+                const isUrgent = daysLeft < 7;
+                return (
+                  <div key={reminder.id} className={`p-4 rounded-xl border-l-4 shadow-sm flex justify-between items-center group transition-all hover:translate-x-1 ${isExpired ? 'border-red-500 bg-red-50 dark:bg-red-900/20' : (isUrgent ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20' : 'border-green-500 bg-white dark:bg-slate-800')}`}>
+                    <div className={`flex-1 ${isDark ? 'text-white' : 'text-black'}`}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-bold text-lg tracking-wide">{reminder.carNumber}</h3>
+                        {isExpired && <span className="bg-red-100 text-red-600 text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse border border-red-200">EXPIRED</span>}
+                        {isUrgent && !isExpired && <span className="bg-yellow-100 text-yellow-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-yellow-200">SOON</span>}
+                      </div>
+                      <div className="flex items-center gap-2 opacity-70 text-sm">
+                        <User size={12} /> {reminder.customerName || "No Name"}
+                        {reminder.mobileNumber && <span className="flex items-center gap-1 ml-2"><Phone size={12} /> {reminder.mobileNumber}</span>}
+                      </div>
+                      <p className={`text-xs font-bold mt-2 flex items-center gap-1 ${isExpired ? 'text-red-500' : (isUrgent ? 'text-yellow-600' : 'text-green-600')}`}>
+                        <Clock size={12} /> {isExpired ? `${Math.abs(daysLeft)} days overdue` : `${daysLeft} days left`} ({new Date(reminder.expiryDate).toLocaleDateString()})
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => handleEditGpsReminder(reminder)} className={`p-2 rounded-full transition-colors ${isDark ? 'bg-slate-700 hover:bg-slate-600 text-blue-400' : 'bg-gray-100 hover:bg-blue-50 text-blue-600'}`}><Edit size={18} /></button>
+                      <button onClick={() => handleDeleteGpsReminder(reminder.id)} className={`p-2 rounded-full transition-colors ${isDark ? 'bg-slate-700 hover:bg-slate-600 text-red-400' : 'bg-gray-100 hover:bg-red-50 text-red-600'}`}><Trash2 size={18} /></button>
+                    </div>
+                  </div>
+                );
+              })}
+            {(data.gpsReminders || []).length === 0 && <div className="text-center opacity-40 mt-10 flex flex-col items-center gap-2"><Zap size={48} /> {t("No GPS Reminders Found")}</div>}
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -2767,13 +2991,15 @@ function DukanRegister() {
         requestNotificationPermission={requestNotificationPermission}
         setIsPrivacyOpen={setIsPrivacyOpen}
         setIsFaqOpen={setIsFaqOpen}
+        setIsFaqOpen={setIsFaqOpen}
         handleLogout={handleLogout}
         triggerConfirm={triggerConfirm}
+        setPreviousView={setPreviousView}
       />}
 
       {/* Bills view removed */}
 
-      {view === 'tools' && <ToolsHub onBack={() => { setView('settings'); setInitialNoteId(null); }} t={t} isDark={isDark} initialTool={activeToolId} initialNoteId={initialNoteId} pinnedTools={data.settings.pinnedTools || []} onTogglePin={handleTogglePin} shopDetails={data.settings} />}
+      {view === 'tools' && <ToolsHub onBack={() => { setView(previousView || 'settings'); setInitialNoteId(null); }} t={t} isDark={isDark} initialTool={activeToolId} initialNoteId={initialNoteId} pinnedTools={data.settings.pinnedTools || []} onTogglePin={handleTogglePin} shopDetails={data.settings} data={data} />}
 
 
       {renderSaveButton()}

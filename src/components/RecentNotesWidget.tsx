@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { StickyNote, Plus, ChevronRight, Clock } from 'lucide-react';
+import { StickyNote, ChevronRight, Clock } from 'lucide-react';
 
 interface Note {
     id: number;
@@ -20,20 +20,44 @@ export const RecentNotesWidget: React.FC<RecentNotesWidgetProps> = ({ onNavigate
     const [notes, setNotes] = useState<Note[]>([]);
 
     useEffect(() => {
-        try {
-            const saved = localStorage.getItem('proNotes');
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                // Sort by id (timestamp) descending to get most recent
-                const sorted = Array.isArray(parsed) ? parsed.sort((a: any, b: any) => b.id - a.id).slice(0, 3) : [];
-                setNotes(sorted);
+        const loadNotes = () => {
+            try {
+                const saved = localStorage.getItem('proNotes');
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    // Sort by id (timestamp) descending to get most recent
+                    const sorted = Array.isArray(parsed) ? parsed.sort((a: any, b: any) => b.id - a.id).slice(0, 3) : [];
+                    setNotes(sorted);
+                } else {
+                    setNotes([]);
+                }
+            } catch (e) {
+                console.error('Failed to load notes for widget', e);
             }
-        } catch (e) {
-            console.error('Failed to load notes for widget', e);
-        }
+        };
+
+        loadNotes();
+        window.addEventListener('notesUpdated', loadNotes);
+        window.addEventListener('storage', loadNotes);
+        window.addEventListener('focus', loadNotes);
+        return () => {
+            window.removeEventListener('notesUpdated', loadNotes);
+            window.removeEventListener('storage', loadNotes);
+            window.removeEventListener('focus', loadNotes);
+        };
     }, []);
 
-    if (notes.length === 0) return null;
+    if (notes.length === 0) {
+        return (
+            <div className="mx-4 mt-4">
+                <div className={`p-4 rounded-2xl border-l-4 border-gray-300 shadow-sm ${isDark ? 'bg-slate-800' : 'bg-white'}`}>
+                    <div className="text-center opacity-70 italic text-sm">
+                        {t('No recent notes')}
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="mx-4 mt-4">
