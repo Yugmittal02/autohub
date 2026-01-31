@@ -62,7 +62,8 @@ export const performSmartSearch = (rawTranscript: string, inventory: any[], page
     const matches = scoredItems
         .filter((i: any) => i.score > 0)
         .sort((a: any, b: any) => b.score - a.score)
-        .slice(0, 10); // Limit to top 10 results
+        .sort((a: any, b: any) => b.score - a.score);
+
 
     return { match: matches.length > 0, items: matches, interpretedAs: processedText };
 };

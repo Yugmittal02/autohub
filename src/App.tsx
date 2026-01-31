@@ -31,7 +31,10 @@ import { performSmartSearch } from './lib/search';
 import { exactDictionary, synonymMap, soundMap } from './data/dictionaries';
 import { ToolsHub } from './components/ToolsHub';
 import { ItemsPage } from './components/ItemsPage';
+
 import { TranslateBtn } from './components/TranslateBtn';
+import { RecentNotesWidget } from './components/RecentNotesWidget';
+
 
 interface SearchResult {
   match: boolean;
@@ -1304,6 +1307,8 @@ function DukanRegister() {
   const [view, setView] = useState('generalIndex');
   const [activePageId, setActivePageId] = useState(null);
   const [activeToolId, setActiveToolId] = useState(null);
+  const [initialNoteId, setInitialNoteId] = useState<number | null>(null);
+
 
   // ?? GHOST MIC STATE
   const [isGhostMicOpen, setIsGhostMicOpen] = useState(false);
@@ -2480,6 +2485,21 @@ function DukanRegister() {
         onNavigate={(pageId) => { setActivePageId(pageId); setView('page'); }}
       />
 
+      <RecentNotesWidget
+        onNavigate={(noteId) => {
+          // Reset tool view state first
+          setActiveToolId(null);
+          setTimeout(() => {
+            setActiveToolId('notes');
+            if (noteId) setInitialNoteId(noteId);
+            setView('tools');
+          }, 50);
+        }}
+        isDark={isDark}
+        t={t}
+      />
+
+
       {data.settings.pinnedTools && data.settings.pinnedTools.length > 0 && (
         <div className={`py-3 px-4 border-b overflow-x-auto whitespace-nowrap flex gap-3 hide-scrollbar ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-gray-50 border-gray-200'}`}>
           {[
@@ -2753,7 +2773,8 @@ function DukanRegister() {
 
       {/* Bills view removed */}
 
-      {view === 'tools' && <ToolsHub onBack={() => setView('settings')} t={t} isDark={isDark} initialTool={activeToolId} pinnedTools={data.settings.pinnedTools || []} onTogglePin={handleTogglePin} shopDetails={data.settings} />}
+      {view === 'tools' && <ToolsHub onBack={() => { setView('settings'); setInitialNoteId(null); }} t={t} isDark={isDark} initialTool={activeToolId} initialNoteId={initialNoteId} pinnedTools={data.settings.pinnedTools || []} onTogglePin={handleTogglePin} shopDetails={data.settings} />}
+
 
       {renderSaveButton()}
 

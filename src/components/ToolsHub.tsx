@@ -4,12 +4,17 @@ import {
     Calculator, FileText, Percent, DollarSign, RefreshCcw, Activity,
     CreditCard, StickyNote, Languages, Share2, Zap, X, Copy, Plus, Minus,
     Trash2, Clock, Search, Bold, Italic, Underline, Highlighter, PenTool,
-    Circle as CircleIcon, Eraser, ArrowLeft, Pin, Phone, Store, Download, Package
+    Circle as CircleIcon, Eraser, ArrowLeft, Pin, Phone, Store, Download, Package, Mic
 } from 'lucide-react';
 import { translateWithGoogle, transliterateWithGoogle, convertToHindiFallback } from '../lib/translation';
-import VoiceInput from './VoiceInput';
 
-export const ToolsHub = ({ onBack, t, isDark, initialTool = null, pinnedTools, onTogglePin, shopDetails }: any) => {
+import VoiceInput from './VoiceInput';
+import { FloatingNoteMenu } from './FloatingNoteMenu';
+
+
+
+export const ToolsHub = ({ onBack, t, isDark, initialTool = null, initialNoteId = null, pinnedTools, onTogglePin, shopDetails }: any) => {
+
     const [activeTool, setActiveTool] = useState(initialTool);
     const [invoiceNumber] = useState(() => Date.now().toString().slice(-4));
     const [gstInput, setGstInput] = useState({ price: '', rate: 18, isReverse: false });
@@ -51,6 +56,21 @@ export const ToolsHub = ({ onBack, t, isDark, initialTool = null, pinnedTools, o
     const [brushType, setBrushType] = useState('pencil');
     const [startPos, setStartPos] = useState({ x: 0, y: 0 });
 
+    // Handle Deep Linking to Specific Note
+    useEffect(() => {
+        if (initialNoteId && activeTool === 'notes' && notes.length > 0) {
+            const numId = Number(initialNoteId);
+            const targetNote = notes.find(n => n.id === numId);
+            if (targetNote) {
+                setCurrentNote(targetNote);
+                setNotesView('editor');
+                if (targetNote.sketch) setNoteMode('draw');
+                else setNoteMode('text');
+            }
+        }
+    }, [initialNoteId, activeTool, notes]);
+
+
     // ?? STOCK VALUE CALCULATOR
     const [stockCalc, setStockCalc] = useState<{ items: any[], newItem: any }>({ items: [], newItem: { name: '', qty: 0, rate: 0 } });
 
@@ -59,9 +79,15 @@ export const ToolsHub = ({ onBack, t, isDark, initialTool = null, pinnedTools, o
     const [calcResult, setCalcResult] = useState('0');
     const [calcHistory, setCalcHistory] = useState<string[]>([]);
 
+
+
+    // ?? VOICE RECORDING STATE
+    const [isRecording, setIsRecording] = useState(false);
+
     useEffect(() => {
         localStorage.setItem('proNotes', JSON.stringify(notes));
     }, [notes]);
+
 
     const tools = [
         { id: 'basicCalc', name: 'Business Calc', icon: <Calculator size={24} />, color: 'bg-teal-100 text-teal-600', desc: 'Quick Calculator' },
@@ -156,6 +182,62 @@ export const ToolsHub = ({ onBack, t, isDark, initialTool = null, pinnedTools, o
         setNoteMode('text');
     };
 
+    const handleNewNoteAction = (type: 'text' | 'list' | 'drawing' | 'image' | 'audio') => {
+        // Reset current note
+        setCurrentNote({ id: null, title: '', body: '', date: '', sketch: null, category: 'general' });
+
+        switch (type) {
+            case 'text':
+                setNoteMode('text');
+                setNotesView('editor');
+                break;
+            case 'list':
+                setNoteMode('text');
+                setCurrentNote(prev => ({ ...prev, body: '<ul><li>Item 1</li><li>Item 2</li></ul>' }));
+                setNotesView('editor');
+                break;
+            case 'drawing':
+                setNoteMode('draw');
+                setNotesView('editor');
+                break;
+            case 'image':
+                // For now, just switch to text mode and maybe insert a placeholder or alert
+                // Ideally this would trigger a file picker
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'image/*';
+                input.onchange = (e: any) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (event: any) => {
+                            const imgUrl = event.target.result;
+                            setCurrentNote(prev => ({
+                                ...prev,
+                                body: `<img src="${imgUrl}" style="max-width:100%; border-radius: 8px;" /><br/>Write something about this image...`
+                            }));
+                            setNotesView('editor');
+                            setNoteMode('text');
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                };
+                input.click();
+                break;
+            case 'audio':
+                setNoteMode('text');
+                setCurrentNote(prev => ({ ...prev, title: 'Audio Note ' + new Date().toLocaleTimeString() }));
+                setNotesView('editor');
+                // Auto-start dictation
+                setTimeout(() => {
+                    const rec = startDictation();
+                    if (rec) recognitionRef.current = rec;
+                }, 500);
+                break;
+        }
+    };
+
+
     const deleteNote = (id: any) => {
         if (window.confirm("Delete note?")) {
             setNotes(notes.filter(n => n.id !== id));
@@ -192,7 +274,70 @@ export const ToolsHub = ({ onBack, t, isDark, initialTool = null, pinnedTools, o
         if (ctx) { ctx.beginPath(); ctx.moveTo(x, y); }
     };
 
+
+
+    // Custom Dictation Function
+    const startDictation = () => {
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'hi-IN'; // Default to Hindi-India for mixed Hinglish support
+            recognition.continuous = true; // Keep listening
+            recognition.interimResults = true;
+
+            setIsRecording(true);
+
+            recognition.onresult = (event: any) => {
+                let finalTranscript = '';
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) {
+                        finalTranscript += event.results[i][0].transcript;
+                    }
+                }
+
+                if (finalTranscript) {
+                    setCurrentNote(prev => ({
+                        ...prev,
+                        body: (prev.body || '') + ' ' + finalTranscript
+                    }));
+                }
+            };
+
+            recognition.onerror = (event: any) => {
+                console.error("Speech Recognition Error", event.error);
+                if (event.error === 'no-speech') {
+                    // Keep listening or ignore
+                } else {
+                    setIsRecording(false);
+                }
+            };
+
+            recognition.onend = () => {
+                // If user didn't manually stop, maybe restart?
+                // For now, let it stop to avoid loops.
+                setIsRecording(false);
+            };
+
+            recognition.start();
+            return recognition;
+        } else {
+            alert("Voice recognition not supported.");
+            return null;
+        }
+    };
+    // Ref for the recognition instance to stop it if needed
+    const recognitionRef = useRef<any>(null);
+
+    const stopDictation = () => {
+        if (recognitionRef.current) {
+            recognitionRef.current.stop();
+            recognitionRef.current = null;
+        }
+        setIsRecording(false);
+    };
+
     const draw = (e: any) => {
+
         if (!isDrawing || !canvasRef.current) return;
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -1099,10 +1244,13 @@ export const ToolsHub = ({ onBack, t, isDark, initialTool = null, pinnedTools, o
                                     <StickyNote className="text-yellow-500" size={24} />
                                     Note Master
                                 </h3>
-                                <button onClick={() => { setCurrentNote({ id: null, title: '', body: '', date: '', sketch: null, category: 'general' }); setNotesView('editor'); }} className="bg-yellow-500 text-white px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1 shadow-lg hover:bg-yellow-600 transition-all">
-                                    <Plus size={14} /> New Note
-                                </button>
+                                <h3 className="font-bold text-xl flex items-center gap-2">
+                                    <StickyNote className="text-yellow-500" size={24} />
+                                    Note Master
+                                </h3>
+                                {/* Removed old 'New Note' button */}
                             </div>
+
 
                             <div className="relative mb-4">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
@@ -1138,9 +1286,11 @@ export const ToolsHub = ({ onBack, t, isDark, initialTool = null, pinnedTools, o
                                     </div>
                                 )}
                             </div>
+                            <FloatingNoteMenu onSelect={handleNewNoteAction} />
                         </div>
                     );
                 }
+
 
                 return (
                     <div className="flex flex-col h-full bg-white rounded-2xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200">
@@ -1156,7 +1306,13 @@ export const ToolsHub = ({ onBack, t, isDark, initialTool = null, pinnedTools, o
                                 <button onClick={saveCurrentNote} className="p-2 text-green-600 hover:bg-green-50 rounded-full font-bold">Save</button>
                             </div>
                         </div>
+                        {isRecording && (
+                            <div className="bg-red-500 text-white p-2 text-center text-xs font-bold animate-pulse flex items-center justify-center gap-2 cursor-pointer" onClick={stopDictation}>
+                                <Mic size={14} /> Recording... (Tap to Stop)
+                            </div>
+                        )}
                         {/* Editor Toolbar */}
+
                         <div className="flex border-b">
                             <button onClick={() => setNoteMode('text')} className={`flex-1 p-2 text-xs font-bold flex items-center justify-center gap-1 ${noteMode === 'text' ? 'bg-white border-b-2 border-primary text-primary' : 'bg-gray-50 text-gray-500'}`}><FileText size={14} /> Text</button>
                             <button onClick={() => setNoteMode('draw')} className={`flex-1 p-2 text-xs font-bold flex items-center justify-center gap-1 ${noteMode === 'draw' ? 'bg-white border-b-2 border-purple-500 text-purple-600' : 'bg-gray-50 text-gray-500'}`}><PenTool size={14} /> Sketch</button>
