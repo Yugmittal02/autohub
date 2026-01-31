@@ -20,7 +20,14 @@ export const ToolsHub = ({ onBack, t, isDark, initialTool = null, initialNoteId 
     const [gstInput, setGstInput] = useState({ price: '', rate: 18, isReverse: false });
     const [marginInput, setMarginInput] = useState({ cost: '', sell: '', discount: 0, mode: 'profit', markup: '' });
     const [notesView, setNotesView] = useState('list');
-    const [notes, setNotes] = useState<any[]>([]);
+    const [notes, setNotes] = useState<any[]>(() => {
+        try {
+            const saved = localStorage.getItem('proNotes');
+            return saved ? JSON.parse(saved) : [];
+        } catch (e) {
+            return [];
+        }
+    });
 
 
     const [convInput, setConvInput] = useState({ val: '', type: 'kgToTon' });
@@ -1244,10 +1251,7 @@ export const ToolsHub = ({ onBack, t, isDark, initialTool = null, initialNoteId 
                                     <StickyNote className="text-yellow-500" size={24} />
                                     Note Master
                                 </h3>
-                                <h3 className="font-bold text-xl flex items-center gap-2">
-                                    <StickyNote className="text-yellow-500" size={24} />
-                                    Note Master
-                                </h3>
+
                                 {/* Removed old 'New Note' button */}
                             </div>
 
