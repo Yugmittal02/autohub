@@ -130,6 +130,32 @@ export const ToolsHub = ({ onBack, t, isDark, initialTool = null, initialNoteId 
     const [calcResult, setCalcResult] = useState('0');
     const [calcHistory, setCalcHistory] = useState<string[]>([]);
 
+    // Real-time calculation effect
+    useEffect(() => {
+        if (activeTool !== 'basicCalc') return;
+        if (!calcExpression) {
+            setCalcResult('0');
+            return;
+        }
+
+        // Don't calculate if expression ends with operator
+        if (/[+\-*/.]$/.test(calcExpression)) return;
+
+        try {
+            const sanitized = calcExpression.replace(/[^0-9+\-*/.() ]/g, '');
+            // Evaluate
+            // eslint-disable-next-line no-new-func
+            const result = new Function('return ' + sanitized)();
+            if (isFinite(result) && !isNaN(result)) {
+                // Formatting: max 6 decimals
+                const formatted = Number(result.toFixed(6)).toString();
+                setCalcResult(formatted);
+            }
+        } catch (e) {
+            // Ignore incomplete expressions
+        }
+    }, [calcExpression, activeTool]);
+
 
 
     // ?? VOICE RECORDING STATE
@@ -438,40 +464,29 @@ export const ToolsHub = ({ onBack, t, isDark, initialTool = null, initialNoteId 
         switch (activeTool) {
             case 'basicCalc': {
                 const handleCalcInput = (value: string) => {
-                    if (calcResult !== '0' && calcResult !== 'Error' && !isNaN(Number(value))) {
-                        if (calcExpression.includes('=')) {
-                            setCalcExpression(value);
-                            setCalcResult('0');
-                            return;
-                        }
-                    }
-                    const newExp = calcExpression.includes('=') ? value : calcExpression + value;
-                    setCalcExpression(newExp);
+                    // Reset if we just finished a calculation (if expression was replaced by result)
+                    // Logic: If expression is exactly the result, start fresh? No, user might want to continue.
+                    // Just append.
+                    setCalcExpression(prev => prev + value);
                 };
 
                 const handleOperator = (op: string) => {
                     if (calcExpression === '' && op !== '-') return;
                     const lastChar = calcExpression.slice(-1);
                     if (['+', '-', '*', '/', '.'].includes(lastChar)) {
-                        setCalcExpression(calcExpression.slice(0, -1) + op);
+                        setCalcExpression(prev => prev.slice(0, -1) + op);
                     } else {
-                        setCalcExpression(calcExpression + op);
+                        setCalcExpression(prev => prev + op);
                     }
                 };
 
-                const calculateResult = () => {
-                    try {
-                        if (!calcExpression || calcExpression === '') return;
-                        const sanitized = calcExpression.replace(/[^0-9+\-*/.() ]/g, '');
-                        if (!sanitized) return;
-                        const result = new Function('return ' + sanitized)();
-                        const finalResult = isNaN(result) || !isFinite(result) ? 'Error' : Number(result.toFixed(6)).toString();
-                        setCalcResult(finalResult);
-                        const historyEntry = `${calcExpression} = ${finalResult}`;
+                // When = is pressed, commit to history
+                const finalizeResult = () => {
+                    if (calcResult !== 'Error' && calcResult !== '0') {
+                        const historyEntry = `${calcExpression} = ${calcResult}`;
                         setCalcHistory(prev => [historyEntry, ...prev.slice(0, 9)]);
-                        setCalcExpression(calcExpression + ' = ' + finalResult);
-                    } catch (e) {
-                        setCalcResult('Error');
+                        // Set expression to result to allow chaining
+                        setCalcExpression(calcResult);
                     }
                 };
 
@@ -481,77 +496,98 @@ export const ToolsHub = ({ onBack, t, isDark, initialTool = null, initialNoteId 
                 };
 
                 const backspace = () => {
-                    if (calcExpression.includes('=')) {
-                        clearCalc();
-                    } else {
-                        setCalcExpression(calcExpression.slice(0, -1));
-                    }
+                    setCalcExpression(prev => prev.slice(0, -1));
                 };
 
                 const buttons = [
-                    { label: 'C', action: clearCalc, color: 'bg-red-500 text-white' },
-                    { label: '(', action: () => handleCalcInput('('), color: 'bg-gray-200' },
-                    { label: ')', action: () => handleCalcInput(')'), color: 'bg-gray-200' },
-                    { label: '÷', action: () => handleOperator('/'), color: 'bg-teal-500 text-white' },
-                    { label: '7', action: () => handleCalcInput('7'), color: 'bg-gray-100' },
-                    { label: '8', action: () => handleCalcInput('8'), color: 'bg-gray-100' },
-                    { label: '9', action: () => handleCalcInput('9'), color: 'bg-gray-100' },
-                    { label: '×', action: () => handleOperator('*'), color: 'bg-teal-500 text-white' },
-                    { label: '4', action: () => handleCalcInput('4'), color: 'bg-gray-100' },
-                    { label: '5', action: () => handleCalcInput('5'), color: 'bg-gray-100' },
-                    { label: '6', action: () => handleCalcInput('6'), color: 'bg-gray-100' },
-                    { label: '-', action: () => handleOperator('-'), color: 'bg-teal-500 text-white' },
-                    { label: '1', action: () => handleCalcInput('1'), color: 'bg-gray-100' },
-                    { label: '2', action: () => handleCalcInput('2'), color: 'bg-gray-100' },
-                    { label: '3', action: () => handleCalcInput('3'), color: 'bg-gray-100' },
-                    { label: '+', action: () => handleOperator('+'), color: 'bg-teal-500 text-white' },
-                    { label: '0', action: () => handleCalcInput('0'), color: 'bg-gray-100 col-span-1' },
-                    { label: '.', action: () => handleCalcInput('.'), color: 'bg-gray-100' },
-                    { label: '⌫', action: backspace, color: 'bg-orange-400 text-white' },
-                    { label: '=', action: calculateResult, color: 'bg-gradient-to-r from-teal-600 to-emerald-600 text-white' },
+                    { label: 'C', action: clearCalc, color: 'bg-red-500 text-white shadow-red-500/30' },
+                    { label: '(', action: () => handleCalcInput('('), color: 'bg-gray-200 dark:bg-slate-700 dark:text-gray-300' },
+                    { label: ')', action: () => handleCalcInput(')'), color: 'bg-gray-200 dark:bg-slate-700 dark:text-gray-300' },
+                    { label: '÷', action: () => handleOperator('/'), color: 'bg-indigo-500 text-white shadow-indigo-500/30' },
+                    { label: '7', action: () => handleCalcInput('7'), color: 'bg-white dark:bg-slate-800' },
+                    { label: '8', action: () => handleCalcInput('8'), color: 'bg-white dark:bg-slate-800' },
+                    { label: '9', action: () => handleCalcInput('9'), color: 'bg-white dark:bg-slate-800' },
+                    { label: '×', action: () => handleOperator('*'), color: 'bg-indigo-500 text-white shadow-indigo-500/30' },
+                    { label: '4', action: () => handleCalcInput('4'), color: 'bg-white dark:bg-slate-800' },
+                    { label: '5', action: () => handleCalcInput('5'), color: 'bg-white dark:bg-slate-800' },
+                    { label: '6', action: () => handleCalcInput('6'), color: 'bg-white dark:bg-slate-800' },
+                    { label: '-', action: () => handleOperator('-'), color: 'bg-indigo-500 text-white shadow-indigo-500/30' },
+                    { label: '1', action: () => handleCalcInput('1'), color: 'bg-white dark:bg-slate-800' },
+                    { label: '2', action: () => handleCalcInput('2'), color: 'bg-white dark:bg-slate-800' },
+                    { label: '3', action: () => handleCalcInput('3'), color: 'bg-white dark:bg-slate-800' },
+                    { label: '+', action: () => handleOperator('+'), color: 'bg-indigo-500 text-white shadow-indigo-500/30' },
+                    { label: '0', action: () => handleCalcInput('0'), color: 'bg-white dark:bg-slate-800 col-span-1' },
+                    { label: '.', action: () => handleCalcInput('.'), color: 'bg-white dark:bg-slate-800' },
+                    { label: '⌫', action: backspace, color: 'bg-orange-500 text-white shadow-orange-500/30' },
+                    { label: '=', action: finalizeResult, color: 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-emerald-500/30' },
                 ];
 
                 return (
                     <div className={cardClass}>
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="font-bold text-xl flex items-center gap-2">
-                                <Calculator className="text-teal-500" size={24} />
-                                Business Calculator
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="font-bold text-2xl flex items-center gap-2">
+                                <Calculator className="text-indigo-500" size={24} />
+                                Calculator
                             </h3>
                         </div>
-                        <div className={`p-4 rounded-2xl mb-4 ${isDark ? 'bg-slate-900' : 'bg-gradient-to-br from-teal-50 to-emerald-50'} border-2 border-teal-200`}>
-                            <div className={`text-right mb-2 min-h-[28px] text-sm font-mono overflow-x-auto whitespace-nowrap ${isDark ? 'text-teal-300' : 'text-teal-600'}`}>
+
+                        {/* Display Area */}
+                        <div className={`p-6 rounded-3xl mb-6 shadow-inner flex flex-col items-end justify-end h-32 transition-colors ${isDark ? 'bg-black/40' : 'bg-gray-100'}`}>
+                            {/* Expression (Small) */}
+                            <div className={`text-right w-full mb-1 text-lg font-medium tracking-wide overflow-x-auto whitespace-nowrap hide-scrollbar opacity-60 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
                                 {calcExpression || '0'}
                             </div>
-                            <div className={`text-right text-4xl font-black overflow-x-auto ${calcResult === 'Error' ? 'text-red-500' : isDark ? 'text-white' : 'text-gray-800'}`}>
+
+                            {/* Result (Big) */}
+                            <div className={`text-right w-full text-5xl font-black tracking-tight overflow-x-auto whitespace-nowrap hide-scrollbar ${isDark ? 'text-white' : 'text-slate-800'}`}>
                                 {calcResult}
                             </div>
                         </div>
-                        <div className="grid grid-cols-4 gap-2 flex-1">
+
+                        {/* Keypad */}
+                        <div className="grid grid-cols-4 gap-3 flex-1">
                             {buttons.map((btn, idx) => (
                                 <button
                                     key={idx}
-                                    onClick={btn.action}
-                                    className={`p-4 rounded-xl font-bold text-xl transition-all active:scale-95 hover:opacity-80 shadow-md ${btn.color} ${isDark && btn.color.includes('gray') ? '!bg-slate-700 !text-white' : ''}`}
+                                    onClick={(e) => {
+                                        // Ripple effect or pressed state could be added here
+                                        const target = e.currentTarget;
+                                        target.classList.add('scale-90');
+                                        setTimeout(() => target.classList.remove('scale-90'), 100);
+                                        btn.action();
+                                    }}
+                                    className={`
+                                        relative overflow-hidden
+                                        h-16 rounded-2xl font-bold text-xl transition-all duration-100 ease-out
+                                        flex items-center justify-center
+                                        active:scale-95 hover:brightness-110 shadow-sm
+                                        ${btn.color}
+                                        ${isDark && btn.color.includes('bg-white') ? '!bg-slate-800 !text-white !shadow-slate-900/50' : ''}
+                                    `}
                                 >
                                     {btn.label}
                                 </button>
                             ))}
                         </div>
+
+                        {/* History (Collapsible or visible) */}
                         {calcHistory.length > 0 && (
-                            <div className="mt-4 border-t pt-3">
-                                <p className={`text-xs font-bold mb-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>📜 Recent Calculations</p>
-                                <div className="space-y-1 max-h-24 overflow-y-auto">
+                            <div className="mt-6 pt-4 border-t border-dashed border-gray-300 dark:border-gray-700">
+                                <p className="text-xs font-bold uppercase tracking-wider mb-2 opacity-50">History</p>
+                                <div className="flex gap-2 overflow-x-auto pb-2 hide-scrollbar">
                                     {calcHistory.slice(0, 5).map((entry, idx) => (
                                         <div
                                             key={idx}
                                             onClick={() => {
                                                 const parts = entry.split(' = ');
-                                                if (parts[1]) setCalcExpression(parts[1]);
+                                                if (parts[1]) {
+                                                    setCalcExpression(parts[1]);
+                                                    setCalcResult(parts[1]);
+                                                }
                                             }}
-                                            className={`p-2 rounded-lg text-xs cursor-pointer transition-all ${isDark ? 'bg-slate-700 hover:bg-slate-600' : 'bg-gray-50 hover:bg-gray-100'}`}
+                                            className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-mono cursor-pointer border transition-colors ${isDark ? 'bg-slate-800 border-slate-700 hover:bg-slate-700' : 'bg-white border-gray-200 hover:bg-gray-50'}`}
                                         >
-                                            <span className="font-mono">{entry}</span>
+                                            {entry}
                                         </div>
                                     ))}
                                 </div>
