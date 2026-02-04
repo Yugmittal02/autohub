@@ -14,7 +14,7 @@ interface EntryRowProps {
 }
 
 const EntryRow = React.memo<EntryRowProps>(({ entry, t, isDark, onUpdateBuffer, onEdit, limit, tempQty, index }) => {
-    const displayQty = tempQty !== undefined ? tempQty : entry.qty;
+    const displayQty = Number(tempQty !== undefined ? tempQty : entry.qty) || 0;
     const isChanged = tempQty !== undefined;
 
     return (

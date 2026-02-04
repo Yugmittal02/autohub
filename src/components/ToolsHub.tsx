@@ -6,6 +6,7 @@ import {
     Trash2, Clock, Search, Bold, Italic, Underline, Highlighter, PenTool,
     Circle as CircleIcon, Eraser, ArrowLeft, Pin, Phone, Store, Download, Package, Mic, MessageCircle, FileCheck
 } from 'lucide-react';
+import DOMPurify from 'dompurify';
 import { translateWithGoogle, transliterateWithGoogle, convertToHindiFallback } from '../lib/translation';
 
 import VoiceInput from './VoiceInput';
@@ -844,7 +845,7 @@ export const ToolsHub = ({ onBack, t, isDark, initialTool = null, initialNoteId 
                 };
 
                 return (
-                    <div className={`${cardClass} overflow-y-auto relative bg-gray-50 dark:bg-slate-900`}>
+                    <div className={`${cardClass} overflow-y-auto relative bg-gray-50 dark:bg-slate-900 !p-0 md:!p-6 border-0 md:border`}>
                         {/* TOOLBAR */}
                         <div className="flex justify-between items-center mb-4 sticky top-0 bg-white dark:bg-slate-800 z-10 p-3 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700">
                             <div>
@@ -873,7 +874,7 @@ export const ToolsHub = ({ onBack, t, isDark, initialTool = null, initialNoteId 
                         </div>
 
                         {/* ENTERPRISE PAPER LAYOUT */}
-                        <div id="print-area" className="bg-white text-black p-6 rounded-xl shadow-lg border border-gray-200 min-h-[600px] flex flex-col relative max-w-4xl mx-auto">
+                        <div id="print-area" className="bg-white text-black p-3 md:p-6 rounded-none md:rounded-xl shadow-none md:shadow-lg border-0 md:border border-gray-200 min-h-[600px] flex flex-col relative max-w-4xl mx-auto">
 
                             {/* BRANDING HEADER */}
                             <div className="flex justify-between items-start border-b-4 border-indigo-600 pb-4 mb-6">
@@ -1582,7 +1583,7 @@ export const ToolsHub = ({ onBack, t, isDark, initialTool = null, initialNoteId 
                                     >
                                         <div>
                                             <h4 className="font-bold text-sm line-clamp-1 mb-1">{note.title || 'Untitled Note'}</h4>
-                                            <div className="text-[10px] text-gray-500 line-clamp-3 overflow-hidden text-ellipsis opacity-70" dangerouslySetInnerHTML={{ __html: note.body || (note.sketch ? '[Sketch]' : 'No content') }}></div>
+                                            <div className="text-[10px] text-gray-500 line-clamp-3 overflow-hidden text-ellipsis opacity-70" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(note.body || (note.sketch ? '[Sketch]' : 'No content')) }}></div>
                                         </div>
                                         <div className="flex justify-between items-end mt-2">
                                             <span className="text-[9px] text-gray-400">{note.date.split(',')[0]}</span>

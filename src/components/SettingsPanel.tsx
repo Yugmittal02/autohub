@@ -4,7 +4,7 @@ import {
     CheckCircle, Type, Vibrate, AlertCircle, Zap, Package, AlertTriangle,
     Clock, Lock, SaveAll, FileText, Wifi, WifiOff, MessageSquare,
     ExternalLink, LogOut, ChevronRight, User, Copy, ShieldCheck, Layers,
-    Settings
+    Settings, RefreshCcw
 } from 'lucide-react';
 
 interface SettingsPanelProps {
@@ -23,7 +23,7 @@ interface SettingsPanelProps {
     setView: (view: string) => void;
     deferredPrompt: any;
     setDeferredPrompt: (prompt: any) => void;
-    showToast: (msg: string) => void;
+    showToast: (msg: string, type?: string) => void;
     themePreset: any;
     notifPermission: string;
     requestNotificationPermission: () => void;
@@ -638,6 +638,61 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                                         <Download size={12} /> Export
                                     </div>
                                 </button>
+
+                                {/* Import Data */}
+                                <button
+                                    onClick={() => document.getElementById('restore-input')?.click()}
+                                    className={`w-full p-3 rounded-xl border flex items-center justify-between ${isDark ? 'bg-slate-700/50 border-slate-600' : 'bg-gray-50 border-gray-200'}`}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <RefreshCcw size={18} className="text-blue-500" />
+                                        <div className="text-left">
+                                            <p className="text-sm font-semibold">{t("Restore Data")}</p>
+                                            <p className="text-[10px] opacity-50">{t("Import from backup")}</p>
+                                        </div>
+                                    </div>
+                                    <div className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 text-white text-xs font-bold flex items-center gap-1">
+                                        <ExternalLink size={12} /> Import
+                                    </div>
+                                </button>
+                                <input
+                                    id="restore-input"
+                                    type="file"
+                                    accept=".json"
+                                    className="hidden"
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (!file) return;
+
+                                        triggerConfirm(
+                                            "Restore Backup?",
+                                            "This will OVERWRITE all current data. Are you sure?",
+                                            true,
+                                            () => {
+                                                const reader = new FileReader();
+                                                reader.onload = (event) => {
+                                                    try {
+                                                        const json = JSON.parse(event.target?.result as string);
+                                                        // Basic validation
+                                                        if (json && typeof json === 'object' && Array.isArray(json.entries)) {
+                                                            setData(json);
+                                                            pushToFirebase(json);
+                                                            showToast(t("Data Restored Successfully!"));
+                                                        } else {
+                                                            showToast(t("Invalid Backup File"), "error");
+                                                        }
+                                                    } catch (err) {
+                                                        console.error(err);
+                                                        showToast(t("Failed to parse backup"), "error");
+                                                    }
+                                                };
+                                                reader.readAsText(file);
+                                            }
+                                        );
+                                        // Reset input
+                                        e.target.value = '';
+                                    }}
+                                />
 
                                 {/* Last Backup Info */}
                                 <div className={`p-3 rounded-xl ${isDark ? 'bg-cyan-900/30' : 'bg-cyan-50'} flex items-center justify-between`}>

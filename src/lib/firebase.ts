@@ -40,23 +40,35 @@ try {
 } catch (err: any) {
     // If IndexedDB has version issues, clear it and use memory cache
     if (err?.message?.includes('not compatible') || err?.code === 'failed-precondition') {
-        console.warn('?? Clearing incompatible IndexedDB cache...');
+        console.warn('⚠️ Clearing incompatible IndexedDB cache...');
         try {
-            // Clear the problematic IndexedDB
-            indexedDB.deleteDatabase('firestore/[DEFAULT]/arvindregister-353e5/main');
+            // Clear the problematic IndexedDB - attempt multiple common paths
+            const dbName = `firestore/[DEFAULT]/${firebaseConfig.projectId}/main`;
+            const deleteRequest = indexedDB.deleteDatabase(dbName);
+
+            deleteRequest.onsuccess = () => {
+                console.info('✅ Incompatible Firestore cache cleared successfully');
+            };
+
+            deleteRequest.onerror = () => {
+                console.error('❌ Failed to clear Firestore cache');
+            };
+
             // Fall back to memory cache for this session
             db = initializeFirestore(app, {
                 localCache: memoryLocalCache()
             });
-            console.info('? Firestore initialized with memory cache (cleared old data)');
-        } catch {
+            console.info('✅ Firestore initialized with memory cache (cleared old data)');
+        } catch (innerErr) {
+            console.error('Failed to recover from Firestore error:', innerErr);
             db = getFirestore(app);
-            console.info('? Firestore initialized with default settings');
+            console.info('⚠️ Firestore initialized with default settings');
         }
     } else {
         // Default fallback
+        console.error('Firestore initialization error:', err);
         db = getFirestore(app);
-        console.info('? Firestore initialized with default settings');
+        console.info('⚠️ Firestore initialized with default settings');
     }
 }
 

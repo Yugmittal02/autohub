@@ -1314,6 +1314,15 @@ interface AppSettings {
   } | boolean;
 }
 
+interface GpsReminderLog {
+  id: number;
+  timestamp: number;
+  action: 'created' | 'renewed' | 'updated';
+  details: string;
+  previousDate?: string;
+  newDate?: string;
+}
+
 interface GpsReminder {
   id: number;
   carNumber: string;
@@ -1321,6 +1330,7 @@ interface GpsReminder {
   mobileNumber: string;
   expiryDate: string; // ISO date string
   status: 'active' | 'expired' | 'renewed';
+  history?: GpsReminderLog[];
 }
 
 interface AppDataType {
@@ -2725,13 +2735,44 @@ function DukanRegister() {
     let newReminders = [...(data.gpsReminders || [])];
 
     if (editingGpsId) {
-      newReminders = newReminders.map(r => r.id === editingGpsId ? { ...r, ...gpsInput, id: r.id } : r);
+      newReminders = newReminders.map(r => {
+        if (r.id === editingGpsId) {
+          const oldDate = new Date(r.expiryDate).getTime();
+          const newDate = new Date(gpsInput.expiryDate).getTime();
+          let action: 'updated' | 'renewed' = 'updated';
+          let details = 'Reminder updated';
+
+          if (newDate > oldDate + (1000 * 60 * 60 * 24 * 30)) { // If extended by more than 30 days, consider it a renewal
+            action = 'renewed';
+            details = 'Plan renewed';
+          }
+
+          const newLog: GpsReminderLog = {
+            id: Date.now(),
+            timestamp: Date.now(),
+            action,
+            details,
+            previousDate: r.expiryDate,
+            newDate: gpsInput.expiryDate
+          };
+
+          return { ...r, ...gpsInput, id: r.id, history: [newLog, ...(r.history || [])] };
+        }
+        return r;
+      });
       showToast(t("Reminder Updated"));
     } else {
       const newReminder: GpsReminder = {
         id: Date.now(),
         ...gpsInput,
-        status: 'active'
+        status: 'active',
+        history: [{
+          id: Date.now(),
+          timestamp: Date.now(),
+          action: 'created',
+          details: 'Reminder created',
+          newDate: gpsInput.expiryDate
+        }]
       };
       newReminders = [newReminder, ...newReminders];
       showToast(t("GPS Reminder Set"));
@@ -2802,51 +2843,80 @@ function DukanRegister() {
         </div>
       ) : (
         <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-          <div className={`p-5 rounded-2xl mb-6 shadow-lg border relative overflow-hidden ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-blue-100'}`}>
-            {editingGpsId && <div className="absolute top-0 right-0 bg-yellow-400 text-black text-xs font-bold px-3 py-1 rounded-bl-xl shadow-sm">EDITING MODE</div>}
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-lg flex items-center gap-2">{editingGpsId ? <Edit size={18} className="text-yellow-500" /> : <Plus size={18} className="text-blue-500" />} {editingGpsId ? t("Update Reminder") : t("Add New Reminder")}</h3>
-              {editingGpsId && <button onClick={resetGpsForm} className="text-xs bg-gray-100 dark:bg-slate-700 px-2 py-1 rounded hover:bg-gray-200">{t("Cancel")}</button>}
+          <div className={`p-4 md:p-6 rounded-3xl mb-8 shadow-xl border relative overflow-hidden ${isDark ? 'bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700' : 'bg-gradient-to-br from-white to-blue-50/50 border-white'}`}>
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"></div>
+
+            {editingGpsId && <div className="absolute top-1 right-0 bg-gradient-to-l from-yellow-400 to-orange-400 text-white text-[10px] font-black tracking-widest px-4 py-1 rounded-bl-xl shadow-lg uppercase">Editing Mode</div>}
+
+            <div className="flex justify-between items-center mb-6 mt-2">
+              <h3 className="font-black text-xl flex items-center gap-3">
+                <div className={`p-2 rounded-xl ${editingGpsId ? 'bg-yellow-100 text-yellow-600' : 'bg-blue-100 text-blue-600'}`}>
+                  {editingGpsId ? <Edit size={20} /> : <Zap size={20} />}
+                </div>
+                {editingGpsId ? t("Update Reminder") : t("New GPS Reminder")}
+              </h3>
+              {editingGpsId && <button onClick={resetGpsForm} className="text-xs bg-slate-100 dark:bg-slate-700 px-3 py-1.5 rounded-full font-bold hover:bg-slate-200 transition-colors">{t("Cancel")}</button>}
             </div>
 
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <input className={`w-full p-3 rounded-xl outline-none border transition-all focus:ring-2 focus:ring-blue-500 ${isDark ? 'bg-slate-700 border-slate-600 focus:border-blue-500' : 'bg-gray-50 border-gray-200 focus:border-blue-500'}`} placeholder={t("Car Number")} value={gpsInput.carNumber} onChange={e => setGpsInput({ ...gpsInput, carNumber: e.target.value.toUpperCase() })} />
-                <input className={`w-full p-3 rounded-xl outline-none border transition-all focus:ring-2 focus:ring-blue-500 ${isDark ? 'bg-slate-700 border-slate-600 focus:border-blue-500' : 'bg-gray-50 border-gray-200 focus:border-blue-500'}`} placeholder={t("Mobile No.")} value={gpsInput.mobileNumber} onChange={e => setGpsInput({ ...gpsInput, mobileNumber: e.target.value })} type="tel" maxLength={10} />
-              </div>
-              <input className={`w-full p-3 rounded-xl outline-none border transition-all focus:ring-2 focus:ring-blue-500 ${isDark ? 'bg-slate-700 border-slate-600 focus:border-blue-500' : 'bg-gray-50 border-gray-200 focus:border-blue-500'}`} placeholder={t("Customer Name (Optional)")} value={gpsInput.customerName} onChange={e => setGpsInput({ ...gpsInput, customerName: e.target.value })} />
+            <div className="space-y-4">
+              {/* Form Input Order: Name -> Mobile -> Car */}
+              <div className="flex flex-col md:flex-row gap-4">
+                {/* Customer Name */}
+                <div className="flex-1 space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-wider opacity-60 ml-1">{t("Customer Name")}</label>
+                  <input className={`w-full p-3.5 rounded-2xl outline-none border-2 transition-all focus:border-blue-500 font-bold ${isDark ? 'bg-slate-900/50 border-slate-700 focus:bg-slate-900' : 'bg-white border-gray-100 focus:bg-white shadow-sm'}`} placeholder={t("Enter Name")} value={gpsInput.customerName} onChange={e => setGpsInput({ ...gpsInput, customerName: e.target.value })} />
+                </div>
 
-              <div className="p-3 bg-blue-50 dark:bg-slate-700/50 rounded-xl border border-blue-100 dark:border-slate-600">
-                <label className="text-xs font-bold block mb-2 opacity-70 uppercase tracking-wide">{t("Set Expiry Via")}</label>
-                <div className="flex gap-3 items-center">
-                  <div className="flex-1 relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold opacity-50">Days</span>
-                    <input className={`w-full pl-12 p-2.5 rounded-lg outline-none border text-center font-bold ${isDark ? 'bg-slate-800 border-slate-600' : 'bg-white border-gray-200'}`} placeholder="365" value={validityDays} onChange={e => handleDaysInput(e.target.value)} type="number" />
+                {/* Mobile */}
+                <div className="flex-1 space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-wider opacity-60 ml-1">{t("Mobile Number")}</label>
+                  <input className={`w-full p-3.5 rounded-2xl outline-none border-2 transition-all focus:border-blue-500 font-bold tracking-wide ${isDark ? 'bg-slate-900/50 border-slate-700 focus:bg-slate-900' : 'bg-white border-gray-100 focus:bg-white shadow-sm'}`} placeholder="9876543210" value={gpsInput.mobileNumber} onChange={e => setGpsInput({ ...gpsInput, mobileNumber: e.target.value })} type="tel" maxLength={10} />
+                </div>
+
+                {/* Car Number */}
+                <div className="flex-1 space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-wider opacity-60 ml-1">{t("Car Number")}</label>
+                  <input className={`w-full p-3.5 rounded-2xl outline-none border-2 transition-all focus:border-blue-500 font-bold tracking-wide ${isDark ? 'bg-slate-900/50 border-slate-700 focus:bg-slate-900' : 'bg-white border-gray-100 focus:bg-white shadow-sm'}`} placeholder="GJ-01-AB-1234" value={gpsInput.carNumber} onChange={e => setGpsInput({ ...gpsInput, carNumber: e.target.value.toUpperCase() })} />
+                </div>
+              </div>
+
+              {/* Validity Selection */}
+              <div className={`p-4 rounded-2xl border-2 ${isDark ? 'bg-slate-900/30 border-slate-700' : 'bg-blue-50/50 border-blue-100'}`}>
+                <label className="text-xs font-black block mb-3 uppercase tracking-wide text-blue-500 flex items-center gap-2"><Calendar size={14} /> {t("Recharge Validity")}</label>
+                <div className="flex flex-col sm:flex-row gap-4 items-center">
+                  <div className="w-full sm:flex-1 space-y-1">
+                    <label className="text-[10px] font-bold opacity-50 ml-1">DAYS</label>
+                    <input className={`w-full p-3 rounded-xl outline-none border-2 text-center font-black text-lg focus:border-blue-500 transition-all ${isDark ? 'bg-slate-800 border-slate-600' : 'bg-white border-gray-200 shadow-sm'}`} placeholder="365" value={validityDays} onChange={e => handleDaysInput(e.target.value)} type="number" />
                   </div>
-                  <span className="text-xs font-bold opacity-50">OR</span>
-                  <div className="flex-[2]">
-                    <input className={`w-full p-2.5 rounded-lg outline-none border ${isDark ? 'bg-slate-800 border-slate-600' : 'bg-white border-gray-200'}`} type="date" value={gpsInput.expiryDate} onChange={e => { setGpsInput({ ...gpsInput, expiryDate: e.target.value }); setValidityDays(''); }} />
+                  <span className="text-xs font-bold opacity-40 mt-0 sm:mt-4">OR</span>
+                  <div className="w-full sm:flex-[2] space-y-1">
+                    <label className="text-[10px] font-bold opacity-50 ml-1">EXPIRY DATE</label>
+                    <input className={`w-full p-3 rounded-xl outline-none border-2 font-bold focus:border-blue-500 transition-all ${isDark ? 'bg-slate-800 border-slate-600' : 'bg-white border-gray-200 shadow-sm'}`} type="date" value={gpsInput.expiryDate} onChange={e => { setGpsInput({ ...gpsInput, expiryDate: e.target.value }); setValidityDays(''); }} />
                   </div>
                 </div>
               </div>
 
-              <button onClick={handleSaveGpsReminder} className={`w-full py-3.5 rounded-xl font-bold shadow-lg text-white transition-all active:scale-95 flex items-center justify-center gap-2 ${editingGpsId ? 'bg-gradient-to-r from-yellow-500 to-orange-500 shadow-yellow-500/30' : 'bg-gradient-to-r from-blue-600 to-indigo-600 shadow-blue-500/30'}`}>
-                {editingGpsId ? <SaveAll size={20} /> : <Plus size={20} />} {editingGpsId ? t("Update Reminder") : t("Set Reminder")}
+              <button onClick={handleSaveGpsReminder} className={`w-full py-4 rounded-2xl font-bold shadow-xl text-white transition-all active:scale-95 flex items-center justify-center gap-3 text-lg ${editingGpsId ? 'bg-gradient-to-r from-yellow-500 to-orange-600 shadow-yellow-500/30' : 'bg-gradient-to-r from-blue-600 to-indigo-600 shadow-blue-500/30 hover:shadow-blue-500/50'}`}>
+                {editingGpsId ? <SaveAll size={22} /> : <Plus size={22} strokeWidth={3} />} {editingGpsId ? t("Update Reminder") : t("Set Reminder")}
               </button>
             </div>
           </div>
 
-          <div className="mb-4 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 opacity-40" size={18} />
-            <input
-              className={`w-full pl-10 p-3 rounded-xl outline-none border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}
-              placeholder={t("Search by Car No. or Name...")}
-              value={gpsSearchTerm}
-              onChange={e => setGpsSearchTerm(e.target.value)}
-            />
+          {/* Search Bar */}
+          <div className="mb-6 relative group">
+            <div className={`absolute inset-0 bg-blue-500 rounded-2xl blur opacity-20 group-hover:opacity-30 transition-opacity ${isDark ? 'opacity-10' : ''}`}></div>
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 opacity-40" size={20} />
+              <input
+                className={`w-full pl-12 p-4 rounded-2xl outline-none border-2 transition-all font-medium ${isDark ? 'bg-slate-800 border-slate-700 text-white focus:border-blue-500' : 'bg-white border-gray-100 text-gray-800 focus:border-blue-500 shadow-lg shadow-blue-500/5'}`}
+                placeholder={t("Search by Name, Mobile or Car No...")}
+                value={gpsSearchTerm}
+                onChange={e => setGpsSearchTerm(e.target.value)}
+              />
+            </div>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-4">
             {(data.gpsReminders || [])
               .filter(r =>
                 r.carNumber.toLowerCase().includes(gpsSearchTerm.toLowerCase()) ||
@@ -2857,27 +2927,79 @@ function DukanRegister() {
               .map(reminder => {
                 const daysLeft = Math.ceil((new Date(reminder.expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
                 const isExpired = daysLeft < 0;
-                const isUrgent = daysLeft < 7;
+                const isUrgent = daysLeft < 7 && !isExpired;
+
                 return (
-                  <div key={reminder.id} className={`p-4 rounded-xl border-l-4 shadow-sm flex justify-between items-center group transition-all hover:translate-x-1 ${isExpired ? 'border-red-500 bg-red-50 dark:bg-red-900/20' : (isUrgent ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20' : 'border-green-500 bg-white dark:bg-slate-800')}`}>
-                    <div className={`flex-1 ${isDark ? 'text-white' : 'text-black'}`}>
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-bold text-lg tracking-wide">{reminder.carNumber}</h3>
-                        {isExpired && <span className="bg-red-100 text-red-600 text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse border border-red-200">EXPIRED</span>}
-                        {isUrgent && !isExpired && <span className="bg-yellow-100 text-yellow-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-yellow-200">SOON</span>}
+                  <div key={reminder.id} className={`relative rounded-2xl border transition-all hover:scale-[1.01] overflow-hidden ${isExpired ? 'bg-red-50/50 border-red-200 dark:bg-red-900/10 dark:border-red-900/30' : (isUrgent ? 'bg-yellow-50/50 border-yellow-200 dark:bg-yellow-900/10 dark:border-yellow-900/30' : 'bg-white border-gray-100 dark:bg-slate-800 dark:border-slate-700 shadow-sm')}`}>
+                    {/* Status Strip */}
+                    <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${isExpired ? 'bg-red-500' : (isUrgent ? 'bg-yellow-500' : 'bg-green-500')}`}></div>
+
+                    {/* Main Clickable Summary: Name & Mobile */}
+                    <details className="group">
+                      <summary className="list-none cursor-pointer p-5 flex justify-between items-start select-none">
+                        <div className="flex-1 min-w-0 pr-2">
+                          <h3 className={`font-black text-xl tracking-wide flex flex-wrap items-center gap-2 ${isExpired ? 'text-red-700 dark:text-red-400' : 'text-slate-800 dark:text-white'}`}>
+                            {reminder.customerName || "No Name"}
+                            {isExpired && <span className="bg-red-500 text-white text-[9px] px-2 py-0.5 rounded-full uppercase tracking-wider">Expired</span>}
+                          </h3>
+                          <div className="flex items-center gap-2 mt-1">
+                            {reminder.mobileNumber ? (
+                              <span className="text-sm font-bold opacity-70 flex items-center gap-1"><Phone size={14} /> {reminder.mobileNumber}</span>
+                            ) : <span className="text-sm font-bold opacity-40 italic">No mobile</span>}
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <p className={`text-sm font-black flex items-center justify-end gap-1.5 ${isExpired ? 'text-red-600' : (isUrgent ? 'text-yellow-600' : 'text-green-600')}`}>
+                            <Calendar size={14} strokeWidth={3} /> {new Date(reminder.expiryDate).toLocaleDateString()}
+                          </p>
+                          <p className={`text-[10px] font-bold uppercase tracking-wide opacity-70 ${isExpired ? 'text-red-500' : 'text-slate-500'}`}>
+                            {isExpired ? `${Math.abs(daysLeft)} days overdue` : `${daysLeft} days left`}
+                          </p>
+                          <div className="mt-2 text-blue-500 text-[10px] font-bold flex items-center justify-end gap-1 group-open:rotate-180 transition-transform origin-center">
+                            <ChevronDown size={16} />
+                          </div>
+                        </div>
+                      </summary>
+
+                      {/* Hidden Details */}
+                      <div className="px-5 pb-5 pt-0 animate-in slide-in-from-top-2 duration-200">
+                        <div className="pt-4 border-t border-dashed border-gray-200 dark:border-gray-700">
+
+                          {/* Revealed Car Number */}
+                          <div className="bg-slate-100 dark:bg-slate-700/50 p-3 rounded-xl mb-4 flex items-center justify-between">
+                            <span className="text-xs font-bold opacity-50 uppercase tracking-widest">{t("Car Number")}</span>
+                            <span className="text-lg font-black tracking-wider text-slate-800 dark:text-white">{reminder.carNumber}</span>
+                          </div>
+
+                          {/* History Log */}
+                          <div className="mb-4">
+                            <div className="text-[10px] font-bold uppercase tracking-wider opacity-40 mb-2 flex items-center gap-1"><History size={10} /> History Log</div>
+                            <div className="pl-2 border-l-2 border-slate-200 dark:border-slate-700 space-y-3">
+                              {(!reminder.history || reminder.history.length === 0) && <p className="text-[10px] opacity-40 ml-2">No history logs.</p>}
+                              {(reminder.history || []).map(log => (
+                                <div key={log.id} className="relative ml-2">
+                                  <div className={`absolute -left-[13px] top-1.5 w-2 h-2 rounded-full border-2 border-white dark:border-slate-800 ${log.action === 'created' ? 'bg-green-500' : log.action === 'renewed' ? 'bg-purple-500' : 'bg-blue-500'}`}></div>
+                                  <p className="text-xs font-bold opacity-80 flex items-center gap-2">
+                                    <span className={`uppercase text-[9px] px-1.5 py-0.5 rounded ${log.action === 'created' ? 'bg-green-100 text-green-700' : log.action === 'renewed' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>{log.action}</span>
+                                    {new Date(log.timestamp).toLocaleDateString()}
+                                  </p>
+                                  {log.newDate && log.previousDate && log.action !== 'created' && (
+                                    <p className="text-[9px] opacity-50 font-mono mt-0.5">{log.previousDate} ? {log.newDate}</p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Actions */}
+                          <div className="flex gap-2">
+                            <button onClick={(e) => { handleEditGpsReminder(reminder); }} className="flex-1 py-3 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-600 font-bold text-sm flex items-center justify-center gap-2 transition-colors dark:bg-slate-700 dark:text-blue-400 dark:hover:bg-slate-600"><Edit size={16} /> {t("Edit / Renew")}</button>
+                            <button onClick={(e) => { handleDeleteGpsReminder(reminder.id); }} className="flex-1 py-3 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 font-bold text-sm flex items-center justify-center gap-2 transition-colors dark:bg-slate-700 dark:text-red-400 dark:hover:bg-slate-600"><Trash2 size={16} /> {t("Delete")}</button>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 opacity-70 text-sm">
-                        <User size={12} /> {reminder.customerName || "No Name"}
-                        {reminder.mobileNumber && <span className="flex items-center gap-1 ml-2"><Phone size={12} /> {reminder.mobileNumber}</span>}
-                      </div>
-                      <p className={`text-xs font-bold mt-2 flex items-center gap-1 ${isExpired ? 'text-red-500' : (isUrgent ? 'text-yellow-600' : 'text-green-600')}`}>
-                        <Clock size={12} /> {isExpired ? `${Math.abs(daysLeft)} days overdue` : `${daysLeft} days left`} ({new Date(reminder.expiryDate).toLocaleDateString()})
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <button onClick={() => handleEditGpsReminder(reminder)} className={`p-2 rounded-full transition-colors ${isDark ? 'bg-slate-700 hover:bg-slate-600 text-blue-400' : 'bg-gray-100 hover:bg-blue-50 text-blue-600'}`}><Edit size={18} /></button>
-                      <button onClick={() => handleDeleteGpsReminder(reminder.id)} className={`p-2 rounded-full transition-colors ${isDark ? 'bg-slate-700 hover:bg-slate-600 text-red-400' : 'bg-gray-100 hover:bg-red-50 text-red-600'}`}><Trash2 size={18} /></button>
-                    </div>
+                    </details>
                   </div>
                 );
               })}

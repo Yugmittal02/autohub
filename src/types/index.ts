@@ -57,6 +57,15 @@ export interface Settings {
     widgets?: boolean;
 }
 
+export interface GpsReminderLog {
+    id: number;
+    timestamp: number;
+    action: 'created' | 'renewed' | 'updated';
+    details: string;
+    previousDate?: string;
+    newDate?: string;
+}
+
 export interface GpsReminder {
     id: number;
     carNumber: string;
@@ -64,6 +73,7 @@ export interface GpsReminder {
     mobileNumber: string;
     expiryDate: string; // ISO date string
     status: 'active' | 'expired' | 'renewed';
+    history?: GpsReminderLog[];
 }
 
 export interface AppData {
