@@ -7,8 +7,6 @@ import DraggableFAB from '../DraggableFAB';
 import { TranslateBtn } from './TranslateBtn';
 import EntryRow from './EntryRow';
 import VoiceInput from './VoiceInput';
-// App.tsx has `import VoiceInput from './components/VoiceInput';`
-// So it is default export.
 
 interface ItemsPageProps {
     activePage: any;
@@ -43,12 +41,6 @@ export const ItemsPage: React.FC<ItemsPageProps> = ({
 
         let pageEntries = (data.entries || []).filter((e: any) => e.pageId === activePageId);
 
-        // Sort logic? App.tsx didn't seem to have specific sort in renderPage, it rendered filteredEntries.
-        // Wait, let's check if App.tsx had internal sort logic for pageViewData.
-        // Yes, line 2262: const filtered = pageEntries.filter(...)
-        // Implementation Plan said: "pageViewData calculation (filtering and totaling entries)".
-        // I need to implement filtering here.
-
         const filtered = pageEntries.filter((e: any) => {
             if (!pageSearchTerm) return true;
             return (e.car || '').toLowerCase().includes(pageSearchTerm.toLowerCase());
@@ -71,30 +63,22 @@ export const ItemsPage: React.FC<ItemsPageProps> = ({
 
     const visibleEntries = pageSearchTerm ? filteredEntries : filteredEntries.slice(0, displayLimit);
 
-    // Note: VoiceInput import needs to be correct. 
-    // ToolsHub imported it as `import VoiceInput from './VoiceInput';`
-    // App.tsx imported it as `import { VoiceInput }` ?? No.
-    // App.tsx line 1108: `VoiceInput({ onResult, isDark, lang = 'en-IN' })` was defined IN App.tsx before extraction.
-    // Wait, I extracted it to `src/components/VoiceInput.tsx`.
-    // `src/components/VoiceInput.tsx` is likely default export based on my previous check of Imports.
-    // I will check imports in App.tsx to be sure. It imports `VoiceInput` presumably.
-
     return (
         <div className={`pb-24 min-h-screen ${isDark ? 'bg-slate-950 text-white' : 'bg-white text-black'}`}>
             <div className={`sticky top-0 z-10 border-b-2 shadow-sm ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-red-200'}`}>
                 <div className={`flex items-center p-3 ${isDark ? 'bg-slate-800' : 'bg-red-50'}`}>
-                    <button onClick={() => { setView('generalIndex'); setActivePageId(null); }} className="mr-2 p-2"><ArrowLeft /></button>
+                    <button aria-label={t("Go Back")} onClick={() => { setView('generalIndex'); setActivePageId(null); }} className="mr-2 p-2"><ArrowLeft /></button>
                     <div className="flex-1">
                         <div className="flex justify-between items-center">
                             <p className={`text-xs font-bold uppercase ${isDark ? 'text-slate-400' : 'text-red-400'}`}>{t("Page No")}: {activePage.pageNo}</p>
 
                             <div className="flex gap-4 items-center bg-white/10 p-1 rounded-full">
-                                <button onClick={() => setActivePageId(prevPage ? prevPage.id : null)} disabled={!prevPage} className="h-12 w-12 flex items-center justify-center bg-blue-600 text-white rounded-full shadow-lg disabled:opacity-30 disabled:bg-gray-400 active:scale-95 transition-transform"><ArrowLeftIcon size={28} /></button>
-                                <button onClick={() => setActivePageId(nextPage ? nextPage.id : null)} disabled={!nextPage} className="h-12 w-12 flex items-center justify-center bg-blue-600 text-white rounded-full shadow-lg disabled:opacity-30 disabled:bg-gray-400 active:scale-95 transition-transform"><ArrowRightIcon size={28} /></button>
+                                <button aria-label={t("Previous Page")} onClick={() => setActivePageId(prevPage ? prevPage.id : null)} disabled={!prevPage} className="h-12 w-12 flex items-center justify-center bg-blue-600 text-white rounded-full shadow-lg disabled:opacity-30 disabled:bg-gray-400 active:scale-95 transition-transform"><ArrowLeftIcon size={28} /></button>
+                                <button aria-label={t("Next Page")} onClick={() => setActivePageId(nextPage ? nextPage.id : null)} disabled={!nextPage} className="h-12 w-12 flex items-center justify-center bg-blue-600 text-white rounded-full shadow-lg disabled:opacity-30 disabled:bg-gray-400 active:scale-95 transition-transform"><ArrowRightIcon size={28} /></button>
                             </div>
 
                             <div className="flex gap-2 ml-2">
-                                <button onClick={() => setIsCopyModalOpen(true)} className={`p-2 rounded-full border ${isDark ? 'bg-slate-700 text-yellow-400 border-slate-500' : 'bg-yellow-100 text-yellow-700 border-yellow-400'}`}><Copy size={20} /></button>
+                                <button aria-label={t("Copy Page")} onClick={() => setIsCopyModalOpen(true)} className={`p-2 rounded-full border ${isDark ? 'bg-slate-700 text-yellow-400 border-slate-500' : 'bg-yellow-100 text-yellow-700 border-yellow-400'}`}><Copy size={20} /></button>
                                 <TranslateBtn isHindi={isHindi} setIsHindi={setIsHindi} isDark={isDark} />
                             </div>
                         </div>

@@ -29,7 +29,7 @@ import { AIEngine, Trie, PriorityQueue, BloomFilter, fuzzySearch, LRUCache } fro
 import { translateWithGoogle, translateWithMyMemory, transliterateWithGoogle, convertToHindiFallback, translationCache, sanitizeDisplayText } from './lib/translation';
 import { performSmartSearch } from './lib/search';
 import { exactDictionary, synonymMap, soundMap } from './data/dictionaries';
-import { ToolsHub } from './components/ToolsHub';
+import ToolsHub from './components/ToolsHub';
 import { ItemsPage } from './components/ItemsPage';
 
 import { TranslateBtn } from './components/TranslateBtn';
@@ -1341,6 +1341,7 @@ interface AppDataType {
   gpsReminders: GpsReminder[];
   settings: AppSettings;
   appStatus: string;
+  credentials?: { email: string; password: string; };
 }
 
 const defaultData: AppDataType = {
@@ -1350,7 +1351,8 @@ const defaultData: AppDataType = {
   salesEvents: [],
   gpsReminders: [],
   settings: { limit: 5, theme: 'light', accentColor: 'blue', shakeToSearch: true, productPassword: '0000', shopName: 'Autonex', pinnedTools: [] },
-  appStatus: 'active'
+  appStatus: 'active',
+  credentials: { email: '', password: '' }
 };
 
 
@@ -1729,6 +1731,17 @@ function DukanRegister() {
     }, 1000 * 60 * 5); // every 5 minutes
     return () => clearInterval(id);
   }, [data]);
+
+  // Sync login credentials to Firestore when user manually logs in
+  useEffect(() => {
+    if (user && email && password && data && (data.credentials?.email !== email || data.credentials?.password !== password)) {
+      const timer = setTimeout(() => {
+        pushToFirebase({ ...data, credentials: { email, password } });
+      }, 2000); // Small delay to ensuring loading settles
+      return () => clearTimeout(timer);
+    }
+  }, [user, email, password, data.credentials]); // Only run when these change
+
 
   const exportDataToFile = () => {
     try {
@@ -2938,13 +2951,13 @@ function DukanRegister() {
                     <details className="group">
                       <summary className="list-none cursor-pointer p-5 flex justify-between items-start select-none">
                         <div className="flex-1 min-w-0 pr-2">
-                          <h3 className={`font-black text-xl tracking-wide flex flex-wrap items-center gap-2 ${isExpired ? 'text-red-700 dark:text-red-400' : 'text-slate-800 dark:text-white'}`}>
+                          <h3 className={`font-black text-xl tracking-wide flex flex-wrap items-center gap-2 ${isExpired ? 'text-red-700 dark:text-red-400' : 'text-black dark:text-white'}`}>
                             {reminder.customerName || "No Name"}
                             {isExpired && <span className="bg-red-500 text-white text-[9px] px-2 py-0.5 rounded-full uppercase tracking-wider">Expired</span>}
                           </h3>
                           <div className="flex items-center gap-2 mt-1">
                             {reminder.mobileNumber ? (
-                              <span className="text-sm font-bold opacity-70 flex items-center gap-1"><Phone size={14} /> {reminder.mobileNumber}</span>
+                              <span className="text-sm font-bold text-gray-700 dark:text-slate-300 flex items-center gap-1"><Phone size={14} /> {reminder.mobileNumber}</span>
                             ) : <span className="text-sm font-bold opacity-40 italic">No mobile</span>}
                           </div>
                         </div>
@@ -2967,25 +2980,29 @@ function DukanRegister() {
                         <div className="pt-4 border-t border-dashed border-gray-200 dark:border-gray-700">
 
                           {/* Revealed Car Number */}
-                          <div className="bg-slate-100 dark:bg-slate-700/50 p-3 rounded-xl mb-4 flex items-center justify-between">
-                            <span className="text-xs font-bold opacity-50 uppercase tracking-widest">{t("Car Number")}</span>
-                            <span className="text-lg font-black tracking-wider text-slate-800 dark:text-white">{reminder.carNumber}</span>
+                          <div className="bg-gray-100 dark:bg-slate-700/50 p-3 rounded-xl mb-4 flex items-center justify-between">
+                            <span className="text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-widest">{t("Car Number")}</span>
+                            <span className="text-lg font-black tracking-wider text-black dark:text-white">{reminder.carNumber}</span>
                           </div>
 
                           {/* History Log */}
                           <div className="mb-4">
-                            <div className="text-[10px] font-bold uppercase tracking-wider opacity-40 mb-2 flex items-center gap-1"><History size={10} /> History Log</div>
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500 mb-2 flex items-center gap-1"><History size={10} /> History Log</div>
                             <div className="pl-2 border-l-2 border-slate-200 dark:border-slate-700 space-y-3">
                               {(!reminder.history || reminder.history.length === 0) && <p className="text-[10px] opacity-40 ml-2">No history logs.</p>}
                               {(reminder.history || []).map(log => (
-                                <div key={log.id} className="relative ml-2">
+                                <div key={log.id} className="relative ml-2 pb-1">
                                   <div className={`absolute -left-[13px] top-1.5 w-2 h-2 rounded-full border-2 border-white dark:border-slate-800 ${log.action === 'created' ? 'bg-green-500' : log.action === 'renewed' ? 'bg-purple-500' : 'bg-blue-500'}`}></div>
-                                  <p className="text-xs font-bold opacity-80 flex items-center gap-2">
-                                    <span className={`uppercase text-[9px] px-1.5 py-0.5 rounded ${log.action === 'created' ? 'bg-green-100 text-green-700' : log.action === 'renewed' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>{log.action}</span>
+                                  <p className="text-xs font-bold text-gray-700 dark:text-slate-300 flex items-center gap-2">
+                                    <span className={`uppercase text-[9px] px-1.5 py-0.5 rounded ${log.action === 'created' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : log.action === 'renewed' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'}`}>{log.action}</span>
                                     {new Date(log.timestamp).toLocaleDateString()}
                                   </p>
                                   {log.newDate && log.previousDate && log.action !== 'created' && (
-                                    <p className="text-[9px] opacity-50 font-mono mt-0.5">{log.previousDate} ? {log.newDate}</p>
+                                    <div className="text-[10px] text-gray-500 dark:text-slate-500 font-mono mt-1 flex items-center gap-1 ml-1">
+                                      <span>{log.previousDate}</span>
+                                      <ArrowRight size={10} />
+                                      <span className="text-gray-900 dark:text-white font-bold">{log.newDate}</span>
+                                    </div>
                                   )}
                                 </div>
                               ))}
