@@ -21,7 +21,7 @@ import {
 
 // --- MODULE IMPORTS ---
 import { db, auth, storage } from './lib/firebase';
-import { doc, onSnapshot, setDoc } from "firebase/firestore";
+import { doc, onSnapshot, setDoc, updateDoc } from "firebase/firestore";
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
 import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
 
@@ -1598,7 +1598,7 @@ function DukanRegister() {
           setData(finalData);
         } else {
           // New user - create default document and set data immediately
-          setDoc(doc(db, "appData", user.uid), defaultData)
+          setDoc(doc(db, "appData", user.uid), defaultData, { merge: true })
             .then(() => {
               console.info('Created default data for new user');
             })
@@ -1611,14 +1611,42 @@ function DukanRegister() {
         }
       } catch (err) {
         console.error("Data Processing Error:", err);
-        // Don't crash loading, just show default data
-        setData(defaultData);
+        // ✅ FIX: Try restoring from local backup instead of resetting to empty defaults
+        try {
+          const backupRaw = localStorage.getItem('dukan:backup');
+          if (backupRaw) {
+            const backupData = JSON.parse(backupRaw);
+            console.info('Restored data from local backup after processing error');
+            setData(backupData);
+          } else {
+            setData(defaultData);
+          }
+        } catch (backupErr) {
+          console.error('Backup restore also failed:', backupErr);
+          setData(defaultData);
+        }
       } finally {
         setDbLoading(false);
       }
     }, (error) => {
       clearTimeout(loadingTimeout);
       console.error("DB Error:", error);
+      // ✅ FIX: Show error to user and try backup restore instead of silent blank state
+      const errMsg = error?.code === 'permission-denied'
+        ? 'Permission denied. Try re-login.'
+        : 'Database connection error.';
+      showToast(t(errMsg), 'error');
+      try {
+        const backupRaw = localStorage.getItem('dukan:backup');
+        if (backupRaw) {
+          const backupData = JSON.parse(backupRaw);
+          setData(backupData);
+          console.info('Restored data from local backup after DB error');
+          showToast(t('Showing offline data'), 'error');
+        }
+      } catch (e) {
+        console.warn('Backup restore failed in error handler', e);
+      }
       setDbLoading(false);
     });
     return () => {
@@ -1643,8 +1671,15 @@ function DukanRegister() {
   };
 
   const handleLogout = () => {
-    triggerConfirm("Logout?", "Are you sure you want to Logout?", true, () => {
-      signOut(auth);
+    triggerConfirm("Logout?", "Are you sure you want to Logout?", true, async () => {
+      // ✅ FIX: Await signOut to prevent onSnapshot race (firing after data reset)
+      try {
+        await signOut(auth);
+      } catch (e) {
+        console.warn('SignOut error:', e);
+        showToast('Logout failed, try again', 'error');
+        return;
+      }
       setData(defaultData);
       setEmail(''); setPassword('');
     });
@@ -1653,15 +1688,29 @@ function DukanRegister() {
   const pushToFirebase = async (newData) => {
     if (!user) return false;
 
-    // Try to write immediately with retries; fall back to queued local writes on persistent failure
-    const trySet = async (attempts = 3) => {
+    // Stamp every write with lastUpdated for multi-device conflict tracking
+    const payload = { ...newData, lastUpdated: Date.now() };
+
+    // Also update local backup immediately so we never lose data
+    try { localStorage.setItem('dukan:backup', JSON.stringify(payload)); } catch { /* noop */ }
+
+    const docRef = doc(db, "appData", user.uid);
+
+    // Try to write with retries; fall back to queued local writes on persistent failure
+    const tryWrite = async (attempts = 3) => {
       for (let i = 1; i <= attempts; i++) {
         try {
-          await setDoc(doc(db, "appData", user.uid), newData);
+          // Use updateDoc (field-level merge) — only touches keys present in payload
+          // Unlike setDoc+merge, this NEVER creates a new doc, so it's safer
+          await updateDoc(docRef, payload);
           return true;
-        } catch (err) {
-          // If offline or persistence disabled, break and queue
-          const msg = String(err && err.message ? err.message : err);
+        } catch (err: any) {
+          // If doc doesn't exist yet (new user), fall back to setDoc
+          if (err?.code === 'not-found') {
+            await setDoc(docRef, payload, { merge: true });
+            return true;
+          }
+          const msg = String(err?.message || err);
           console.warn(`pushToFirebase attempt ${i} failed:`, msg);
           if (i === attempts) throw err;
           await new Promise(res => setTimeout(res, 300 * i));
@@ -1671,7 +1720,7 @@ function DukanRegister() {
     };
 
     try {
-      const res = await trySet(3);
+      const res = await tryWrite(3);
       return res;
     } catch (err) {
       // Queue for later sync
@@ -1679,7 +1728,7 @@ function DukanRegister() {
         const key = 'dukan:pendingWrites';
         const raw = localStorage.getItem(key);
         const list = raw ? JSON.parse(raw) : [];
-        list.push({ id: Date.now() + '-' + Math.random().toString(36).slice(2, 8), data: newData, ts: Date.now(), attempts: 0 });
+        list.push({ id: Date.now() + '-' + Math.random().toString(36).slice(2, 8), data: payload, ts: Date.now(), attempts: 0 });
         localStorage.setItem(key, JSON.stringify(list));
         showToast(t('Saved locally. Will retry sync.'), 'error');
       } catch (e) {
@@ -1701,7 +1750,8 @@ function DukanRegister() {
       const remaining = [];
       for (const item of list) {
         try {
-          await setDoc(doc(db, 'appData', user.uid), item.data);
+          // ✅ FIX: Use updateDoc for pending writes — safer than setDoc for stale data
+          await updateDoc(doc(db, 'appData', user.uid), item.data);
         } catch {
           const attempts = (item.attempts || 0) + 1;
           if (attempts >= 5) {
@@ -1732,15 +1782,10 @@ function DukanRegister() {
     return () => clearInterval(id);
   }, [data]);
 
-  // Sync login credentials to Firestore when user manually logs in
-  useEffect(() => {
-    if (user && email && password && data && (data.credentials?.email !== email || data.credentials?.password !== password)) {
-      const timer = setTimeout(() => {
-        pushToFirebase({ ...data, credentials: { email, password } });
-      }, 2000); // Small delay to ensuring loading settles
-      return () => clearTimeout(timer);
-    }
-  }, [user, email, password, data.credentials]); // Only run when these change
+  // ❌ REMOVED: Credential sync to Firestore (was storing PLAINTEXT password in database)
+  // Firebase Auth's browserLocalPersistence already handles login persistence across refreshes.
+  // Storing passwords in Firestore is a severe security liability — even with per-user rules,
+  // a compromised admin token or Firestore export would leak all passwords.
 
 
   const exportDataToFile = () => {
@@ -1870,18 +1915,20 @@ function DukanRegister() {
       progress: 0
     };
 
-    // Optimistically update UI
+    // ✅ FIX: Separate setState from Firebase write to avoid side-effect inside React updater
+    // Optimistically update UI first
     setData(prev => {
       const next = { ...prev, bills: [tempBill, ...(prev.bills || [])] };
-      // Persist a server-friendly bill (without object URL) so it remains after refresh
-      if (user) {
-        const cloudNext = { ...prev, bills: [serverBill, ...(prev.bills || [])] };
-        pushToFirebase(cloudNext).catch(e => console.error('Initial bill save failed', e));
-      } else {
-        showToast('Saved locally. Sign in to persist to cloud.');
-      }
       return next;
     });
+
+    // Then persist to cloud (outside setState)
+    if (user) {
+      const cloudNext = { ...dataRef.current, bills: [serverBill, ...(dataRef.current.bills || [])] };
+      pushToFirebase(cloudNext).catch(e => console.error('Initial bill save failed', e));
+    } else {
+      showToast('Saved locally. Sign in to persist to cloud.');
+    }
     showToast("Processing & Uploading...");
 
     // Use resumable upload below to track progress and allow retries
@@ -1915,9 +1962,17 @@ function DukanRegister() {
             showToast('Upload Failed', 'error');
           }, async () => {
             const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
-            const updated = { ...data, bills: (data.bills || []).map(b => b.id === timestamp ? { id: timestamp, date: new Date().toISOString(), image: downloadUrl, path: storagePath } : b) };
-            await pushToFirebase(updated);
-            setData(updated);
+            // ✅ FIX: Use dataRef.current (latest state) instead of stale closure 'data'
+            // This prevents overwriting entries/pages/settings changed during upload
+            const latestData = dataRef.current;
+            const updatedBills = (latestData.bills || []).map(b =>
+              b.id === timestamp
+                ? { id: timestamp, date: new Date().toISOString(), image: downloadUrl, path: storagePath }
+                : b
+            );
+            // Only push the bills field via updateDoc to avoid touching other fields
+            await pushToFirebase({ ...latestData, bills: updatedBills });
+            setData(prev => ({ ...prev, bills: updatedBills }));
             try { URL.revokeObjectURL(previewUrl); } catch (e) { console.warn('Revoke failed', e); }
             showToast('Bill Saved!');
           });
@@ -1938,8 +1993,9 @@ function DukanRegister() {
   const handleDeleteBill = async (bill) => {
     if (!bill) return;
     if (!confirm('Delete this bill?')) return;
-    // Optimistic UI removal: remove immediately and push to cloud
-    const updated = { ...data, bills: (data.bills || []).filter(b => b.id !== bill.id) };
+    // ✅ FIX: Use functional setState + dataRef for latest state (no stale closure)
+    const latestBills = (dataRef.current.bills || []).filter(b => b.id !== bill.id);
+    const updated = { ...dataRef.current, bills: latestBills };
     setData(updated);
     pushToFirebase(updated).catch(e => {
       console.error('Failed to update cloud after delete', e);

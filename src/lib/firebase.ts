@@ -7,7 +7,7 @@ import {
     memoryLocalCache,
     CACHE_SIZE_UNLIMITED
 } from "firebase/firestore";
-import { getAuth } from "firebase/auth";
+import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
 import { getStorage } from "firebase/storage";
 
 // ---------------------------------------------------------
@@ -73,6 +73,12 @@ try {
 }
 
 const auth = getAuth(app);
+
+// ✅ FIX: Explicitly set auth persistence to LOCAL (survives browser refresh & restart)
+setPersistence(auth, browserLocalPersistence)
+  .then(() => console.info('✅ Auth persistence set to LOCAL (IndexedDB)'))
+  .catch((err) => console.warn('⚠️ Auth persistence setting failed:', err));
+
 const storage = getStorage(app);
 
 export { app, db, auth, storage };
