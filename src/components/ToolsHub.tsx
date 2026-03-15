@@ -106,12 +106,7 @@ const ToolsHub: React.FC<ToolsHubProps> = ({ onBack, t, isDark, initialTool = nu
     const [invSettings, setInvSettings] = useState({ showGst: true, discount: 0, discountType: 'flat', paymentMode: 'cash', invoiceType: 'retail', notes: '' });
     const [invCurrentItem, setInvCurrentItem] = useState({ name: '', qty: 1, rate: 0, gst: 18, unit: 'pcs', hsn: '' });
 
-    // ?? TRANSLATOR STATE
-    const [transInput, setTransInput] = useState('');
-    const [transOutput, setTransOutput] = useState('');
-    const [transLang, setTransLang] = useState({ from: 'en', to: 'hi' });
-    const [transLoading, setTransLoading] = useState(false);
-    const [transHistory, setTransHistory] = useState<any[]>([]);
+
 
     const tools = [
         { id: 'basicCalc', name: 'Business Calc', icon: <Calculator size={24} />, color: 'bg-teal-100 text-teal-600', desc: 'Quick Calculator' },
@@ -124,7 +119,6 @@ const ToolsHub: React.FC<ToolsHubProps> = ({ onBack, t, isDark, initialTool = nu
         { id: 'stockvalue', name: 'Stock Value', icon: <Activity size={24} />, color: 'bg-cyan-100 text-cyan-600', desc: 'Inventory Worth' },
         { id: 'card', name: 'Digital Card', icon: <CreditCard size={24} />, color: 'bg-orange-100 text-orange-600', desc: 'Business Card' },
         { id: 'notes', name: 'Note Master', icon: <StickyNote size={24} />, color: 'bg-yellow-100 text-yellow-600', desc: 'Smart Notes' },
-        { id: 'translator', name: 'AI Translator', icon: <Languages size={24} />, color: 'bg-pink-100 text-pink-600', desc: 'Multi-Language' },
         { id: 'supplier', name: 'Suppliers', icon: <DollarSign size={24} />, color: 'bg-red-100 text-red-600', desc: 'Vendor Ledgers' },
         { id: 'udhaar', name: 'Udhaar', icon: <CreditCard size={24} />, color: 'bg-green-100 text-green-600', desc: 'Customer Credit' },
         { id: 'analytics', name: 'Analytics', icon: <BarChart2 size={24} />, color: 'bg-indigo-100 text-indigo-600', desc: 'Sales & Trends' },
@@ -132,41 +126,7 @@ const ToolsHub: React.FC<ToolsHubProps> = ({ onBack, t, isDark, initialTool = nu
         { id: 'import', name: 'Data Import', icon: <UploadCloud size={24} />, color: 'bg-blue-100 text-blue-600', desc: 'Migrate CSV/Excel' },
     ];
 
-    const languageOptions = [
-        { code: 'en', name: 'English' }, { code: 'hi', name: 'Hindi' }, { code: 'gu', name: 'Gujarati' },
-        { code: 'mr', name: 'Marathi' }, { code: 'ta', name: 'Tamil' }, { code: 'te', name: 'Telugu' },
-        { code: 'bn', name: 'Bengali' }, { code: 'pa', name: 'Punjabi' }, { code: 'ur', name: 'Urdu' }, { code: 'ar', name: 'Arabic' },
-    ];
-
-    // TODO: Need to ensure translateWithGoogle is imported
-    const translateWithGoogle = async (text: string, from: string, to: string) => {
-        // Placeholder if global not found, but it should be there.
-        // Assuming it fetches from an API.
-        const res = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=${from}&tl=${to}&dt=t&q=${encodeURIComponent(text)}`);
-        const data = await res.json();
-        return data[0][0][0];
-    }
-
-    const handleTranslate = async () => {
-        if (!transInput.trim()) return;
-        setTransLoading(true);
-        try {
-            let result = await translateWithGoogle(transInput, transLang.from, transLang.to);
-            setTransOutput(result);
-            setTransHistory(prev => [{ input: transInput, output: result, from: transLang.from, to: transLang.to }, ...prev.slice(0, 9)]);
-        } catch (e) {
-            setTransOutput('Translation failed. Please try again.');
-        }
-        setTransLoading(false);
-    };
-
-    const swapLanguages = () => {
-        setTransLang({ from: transLang.to, to: transLang.from });
-        setTransInput(transOutput);
-        setTransOutput('');
-    };
-
-    // Invoice Logic
+// Invoice Logic
     const addInvItem = () => {
         if (!invCurrentItem.name || !invCurrentItem.rate) return;
         const baseTotal = invCurrentItem.qty * invCurrentItem.rate;
@@ -210,9 +170,9 @@ const ToolsHub: React.FC<ToolsHubProps> = ({ onBack, t, isDark, initialTool = nu
             case 'margin': return <MarginCalculator isDark={isDark} onBack={handleBackFromTool} t={t} />;
             case 'emi': return <EmiCalculator isDark={isDark} onBack={handleBackFromTool} />;
             case 'converter': return <UnitConverter isDark={isDark} onBack={handleBackFromTool} t={t} />;
-            case 'stockvalue': return <StockValueCalculator />;
-            case 'card': return <DigitalBusinessCard shopDetails={shopDetails} />;
-            case 'notes': return <NoteMaster t={t} isDark={isDark} initialNoteId={initialNoteId} />;
+            case 'stockvalue': return <StockValueCalculator t={t} isDark={isDark} onBack={handleBackFromTool} />;
+            case 'card': return <DigitalBusinessCard shopDetails={shopDetails} t={t} isDark={isDark} onBack={handleBackFromTool} />;
+            case 'notes': return <NoteMaster t={t} isDark={isDark} initialNoteId={initialNoteId} onBack={handleBackFromTool} />;
             case 'quotation': return <QuotationMaker t={t} shopDetails={shopDetails} data={data} isDark={isDark} onBack={handleBackFromTool} />;
             case 'supplier': return <SupplierLedger isDark={isDark} t={t} onBack={handleBackFromTool} />;
             case 'udhaar': return <CustomerUdhaar isDark={isDark} t={t} onBack={handleBackFromTool} />;
@@ -277,12 +237,15 @@ const ToolsHub: React.FC<ToolsHubProps> = ({ onBack, t, isDark, initialTool = nu
 
                 return (
                     <div className={cardClass}>
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="font-bold text-2xl flex items-center gap-2">
-                                <Calculator className="text-indigo-500" size={24} />
-                                Calculator
-                            </h3>
-                        </div>
+                          <div className="flex items-center gap-3 mb-6 p-4 border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 shrink-0">
+                              <button onClick={handleBackFromTool} className="p-2 -ml-2 rounded-full hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors">
+                                  <ArrowLeft size={24} className={isDark ? 'text-white' : 'text-slate-800'} />
+                              </button>
+                              <h3 className="font-bold text-2xl flex items-center gap-2">
+                                  <Calculator className="text-indigo-500" size={24} />
+                                  Calculator
+                              </h3>
+                          </div>
 
                         {/* Display Area */}
                         <div className={`p-6 rounded-3xl mb-6 shadow-inner flex flex-col items-end justify-end h-32 transition-colors ${isDark ? 'bg-black/40' : 'bg-gray-100'}`}>
@@ -351,12 +314,17 @@ const ToolsHub: React.FC<ToolsHubProps> = ({ onBack, t, isDark, initialTool = nu
             case 'invoice':
                 return (
                     <div className={`${cardClass} overflow-y-auto`}>
-                        <div className="flex justify-between items-center mb-4 border-b pb-3">
-                            <div className="flex items-center gap-2">
-                                <FileText className="text-indigo-500" size={24} />
-                                <div>
-                                    <h3 className="font-bold text-lg">Invoice Pro</h3>
-                                    <p className="text-xs text-gray-500">#{invoiceNumber}</p>
+                          <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 shrink-0">
+                              <div className="flex items-center gap-3">
+                                  <button onClick={handleBackFromTool} className="p-2 -ml-2 rounded-full hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors">
+                                      <ArrowLeft size={24} className={isDark ? 'text-white' : 'text-slate-800'} />
+                                  </button>
+                                  <div className="flex items-center gap-2">
+                                      <FileText className="text-indigo-500" size={24} />
+                                      <div>
+                                          <h3 className="font-bold text-lg leading-tight">Invoice Pro</h3>
+                                          <p className="text-xs text-gray-500">#{invoiceNumber}</p>
+                                      </div>
                                 </div>
                             </div>
                             <div className="flex gap-2">
@@ -550,87 +518,7 @@ const ToolsHub: React.FC<ToolsHubProps> = ({ onBack, t, isDark, initialTool = nu
                     </div>
                 );
 
-            case 'translator':
-                return (
-                    <div className={cardClass}>
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="font-bold text-xl flex items-center gap-2">
-                                <Languages className="text-pink-500" size={24} />
-                                AI Translator Pro
-                            </h3>
-                        </div>
 
-                        <div className="flex items-center gap-2 mb-4 bg-gray-50 p-2 rounded-xl border">
-                            <select
-                                className="flex-1 bg-transparent font-bold text-sm outline-none"
-                                value={transLang.from}
-                                onChange={e => setTransLang({ ...transLang, from: e.target.value })}
-                            >
-                                {languageOptions.map(l => <option key={l.code} value={l.code}>{l.name}</option>)}
-                            </select>
-                            <button onClick={swapLanguages} className="p-2 rounded-full hover:bg-gray-200 transition-all">
-                                <RefreshCcw size={16} />
-                            </button>
-                            <select
-                                className="flex-1 bg-transparent font-bold text-sm outline-none text-right"
-                                value={transLang.to}
-                                onChange={e => setTransLang({ ...transLang, to: e.target.value })}
-                            >
-                                {languageOptions.map(l => <option key={l.code} value={l.code}>{l.name}</option>)}
-                            </select>
-                        </div>
-
-                        <div className="relative mb-4">
-                            <textarea
-                                className={`${commonInputClass} min-h-[120px] resize-none pr-12`}
-                                placeholder="Type text to translate..."
-                                value={transInput}
-                                onChange={e => setTransInput(e.target.value)}
-                            />
-                            <div className="absolute bottom-6 right-4">
-                                <VoiceInput onResult={(txt: string) => setTransInput(txt)} lang={transLang.from} isDark={isDark} />
-                            </div>
-                        </div>
-
-                        <button
-                            onClick={handleTranslate}
-                            disabled={transLoading || !transInput.trim()}
-                            className="w-full py-3 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-xl font-boldshadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2"
-                        >
-                            {transLoading ? <RefreshCcw className="animate-spin" size={20} /> : <Languages size={20} />}
-                            {transLoading ? 'Translating...' : 'Translate Now'}
-                        </button>
-
-                        {transOutput && (
-                            <div className="mt-4 animate-in slide-in-from-bottom-2 fade-in">
-                                <p className="text-xs font-bold text-gray-500 mb-1">TRANSLATION</p>
-                                <div className="p-4 bg-gradient-to-br from-pink-50 to-purple-50 rounded-2xl border-2 border-pink-100 relative">
-                                    <p className="text-lg font-medium leading-relaxed">{transOutput}</p>
-                                    <button
-                                        onClick={() => navigator.clipboard.writeText(transOutput)}
-                                        className="absolute top-2 right-2 p-2 text-pink-400 hover:bg-pink-100 rounded-lg transition-all"
-                                    >
-                                        <Copy size={16} />
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-
-                        {transHistory.length > 0 && (
-                            <div className="mt-6 border-t pt-4">
-                                <p className="text-xs font-bold text-gray-400 mb-3 uppercase tracking-wider">History</p>
-                                <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-                                    {transHistory.map((item, i) => (
-                                        <div key={i} className="p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-all cursor-pointer border" onClick={() => { setTransInput(item.input); setTransOutput(item.output); }}>
-                                            <p className="text-xs text-gray-500 mb-1 line-clamp-1">{item.input}</p>
-                                            <p className="text-sm font-bold text-gray-800 line-clamp-1">{item.output}</p>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                );
             default: return null;
         }
     };
